@@ -32,7 +32,7 @@ export default function CreateProjectPage() {
 			}
 
 			const project = await response.json();
-			router.push(`/project/${project.id}`);
+			router.push(`/project/${project.id}/files`);
 		} catch (error) {
 			setError((error as Error).message);
 			console.error("Error creating project:", error);

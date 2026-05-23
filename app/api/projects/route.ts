@@ -9,6 +9,8 @@ const INDEX_FILE = path.join(process.cwd(), "storage/projects.json")
 /**
  * POST /api/projects - Create a new project
  * @param request 
+ * 
+ * @todo - Ensure slug is unique (append random string if necessary)
  */
 export async function POST(request: Request) {
 	const { name } = await request.json()
@@ -43,6 +45,15 @@ export async function POST(request: Request) {
 
 	projectsIndex.push(newProject)
 	await fs.writeFile(INDEX_FILE, JSON.stringify(projectsIndex, null, 2));
+
+	const manifest = {
+		projectId: id,
+		name,
+		slug,
+		sourceFiles: [],
+	};
+
+	await fs.writeFile(path.join(projectDir, "manifest.json"), JSON.stringify(manifest, null, 2));
 
 	return NextResponse.json(newProject, { status: 201 });
 }
