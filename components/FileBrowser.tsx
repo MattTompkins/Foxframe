@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
+import { ClipVideoPreview } from "@/components/ClipVideoPreview"
 import { isVideoFileName } from "@/lib/video-files"
 import { Grid2X2, Grid3X3, Trash2 } from "lucide-react"
 
@@ -12,95 +13,6 @@ type FileBrowserProps = {
 
 function mediaUrl(projectId: string, fileName: string) {
 	return `/api/projects/${projectId}/media/${encodeURIComponent(fileName)}`
-}
-
-/** Load one preview at a time when visible — avoids browser connection/decoder limits. */
-function VideoPreview({
-	src,
-	fileName,
-}: {
-	src: string
-	fileName: string
-}) {
-	const rootRef = useRef<HTMLDivElement>(null)
-	const [shouldLoad, setShouldLoad] = useState(false)
-	const [failed, setFailed] = useState(false)
-	const [retryCount, setRetryCount] = useState(0)
-
-	useEffect(() => {
-		const node = rootRef.current
-		if (!node) return
-
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries.some((entry) => entry.isIntersecting)) {
-					setShouldLoad(true)
-					observer.disconnect()
-				}
-			},
-			{ rootMargin: "200px" }
-		)
-
-		observer.observe(node)
-		return () => observer.disconnect()
-	}, [])
-
-	const videoSrc =
-		shouldLoad && !failed
-			? retryCount > 0
-				? `${src}?retry=${retryCount}#t=0.001`
-				: `${src}#t=0.001`
-			: undefined
-
-	function handleError() {
-		if (retryCount < 2) {
-			setRetryCount((count) => count + 1)
-			return
-		}
-		setFailed(true)
-	}
-
-	function handleLoadedMetadata(event: React.SyntheticEvent<HTMLVideoElement>) {
-		const video = event.currentTarget
-		if (!Number.isFinite(video.duration) || video.duration <= 0) return
-		// Nudge past t=0 so browsers show a frame (helps MOV / moov-at-end files).
-		const target = Math.min(0.1, video.duration * 0.01)
-		if (video.currentTime < target) {
-			video.currentTime = target
-		}
-	}
-
-	return (
-		<li className="overflow-hidden rounded-lg border border-zinc-700 bg-zinc-800">
-			<div
-				ref={rootRef}
-				className="relative aspect-video w-full bg-black"
-			>
-				{failed ? (
-					<div className="flex h-full min-h-[4.5rem] items-center justify-center px-2 text-center text-xs text-zinc-500">
-						Preview unavailable
-					</div>
-				) : (
-					<video
-						key={retryCount}
-						src={videoSrc}
-						preload={shouldLoad ? "metadata" : "none"}
-						muted
-						playsInline
-						onError={handleError}
-						onLoadedMetadata={handleLoadedMetadata}
-						className="aspect-video w-full object-contain"
-					/>
-				)}
-			</div>
-			<p
-				className="truncate px-2 py-1.5 text-xs text-zinc-300"
-				title={fileName}
-			>
-				{fileName}
-			</p>
-		</li>
-	)
 }
 
 export default function FileBrowser({
@@ -238,19 +150,24 @@ export default function FileBrowser({
 				}
 			>
 				{files.map((fileName) => (
-					<div className="relative">
-						
-						<button 
-							className="absolute top-0 bg-red-600 p-2 right-0 m-2 text-white z-20 rounded-full opacity-70 hover:opacity-100 transition-opacity">
+					<li
+						key={fileName}
+						className="relative overflow-hidden rounded-lg border border-zinc-700 bg-zinc-800"
+					>
+						<button
+							type="button"
+							className="absolute right-0 top-0 z-20 m-2 rounded-full bg-red-600 p-2 text-white opacity-70 transition-opacity hover:opacity-100"
+						>
 							<Trash2 size={gridMode === "large" ? 20 : 14} />
 						</button>
-						
-						<VideoPreview
-							key={fileName}
-							src={mediaUrl(projectId, fileName)}
-							fileName={fileName}
-						/>
-					</div>
+						<ClipVideoPreview src={mediaUrl(projectId, fileName)} />
+						<p
+							className="truncate px-2 py-1.5 text-xs text-zinc-300"
+							title={fileName}
+						>
+							{fileName}
+						</p>
+					</li>
 				))}
 			</ul>
 		</>

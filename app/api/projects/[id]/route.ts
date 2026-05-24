@@ -1,13 +1,76 @@
 import { NextResponse } from "next/server"
 import path from "path"
 import fs from "fs/promises"
-import { isVideoFileName, VIDEO_EXTENSIONS_LABEL } from "@/lib/video-files"
+import { PROJECTS_DIR, readManifest } from "@/lib/manifest"
 
-const PROJECTS_DIR = path.join(process.cwd(), "storage/projects")
 const INDEX_FILE = path.join(process.cwd(), "storage/projects.json")
 
-type Manifest = {
-	sourceFiles: string[]
+type ProjectIndexEntry = {
+	id: string
+	name?: string
+	slug?: string
+	createdAt?: string
+	updatedAt?: string
+}
+
+export async function GET(
+	_req: Request,
+	context: { params: Promise<{ id: string }> }
+) {
+	try {
+		const { id: projectId } = await context.params
+
+		if (!projectId) {
+			return NextResponse.json(
+				{ error: "Missing project ID" },
+				{ status: 400 }
+			)
+		}
+
+		const projectPath = path.join(PROJECTS_DIR, projectId)
+
+		try {
+			await fs.access(projectPath)
+		} catch {
+			return NextResponse.json(
+				{ error: "Project not found" },
+				{ status: 404 }
+			)
+		}
+
+		let indexEntry: ProjectIndexEntry | undefined
+
+		try {
+			const indexData = await fs.readFile(INDEX_FILE, "utf-8")
+			const projects = JSON.parse(indexData) as ProjectIndexEntry[]
+			indexEntry = projects.find((project) => project.id === projectId)
+		} catch (err: unknown) {
+			if (
+				!(err && typeof err === "object" && "code" in err && err.code === "ENOENT")
+			) {
+				throw err
+			}
+		}
+
+		const manifest = await readManifest(projectId)
+
+		return NextResponse.json({
+			id: projectId,
+			name:
+				indexEntry?.name ??
+				manifest?.name ??
+				`Project ${projectId.slice(0, 8)}`,
+			slug: indexEntry?.slug ?? manifest?.slug ?? projectId,
+			createdAt: indexEntry?.createdAt,
+			updatedAt: indexEntry?.updatedAt,
+		})
+	} catch (error) {
+		console.error("GET project error:", error)
+		return NextResponse.json(
+			{ error: "Failed to load project" },
+			{ status: 500 }
+		)
+	}
 }
 
 export async function DELETE(
