@@ -3,53 +3,42 @@ import fs from "fs/promises"
 import path from "path"
 import type { Manifest } from "@/lib/manifest"
 import { PROJECTS_DIR, readManifest } from "@/lib/manifest"
+import {
+	DEFAULT_EDIT_FPS,
+	DEFAULT_VIDEO_TRACK_ID,
+	defaultVideoTrack,
+	defaultVideoTrack2,
+	normalizeProjectEdit,
+	roundTimelineSeconds,
+	toEditSummary,
+	type EditSummary,
+	type ProjectEdit,
+	type TimelineClip,
+} from "@/lib/edit-core"
+
+export {
+	DEFAULT_EDIT_FPS,
+	DEFAULT_VIDEO_TRACK_ID,
+	clipTimelineDuration,
+	clipTimelineEnd,
+	clipsActiveAtTime,
+	computeEditDuration,
+	defaultVideoTrack,
+	defaultVideoTrack2,
+	normalizeProjectEdit,
+	normalizeTimelineClip,
+	roundTimelineSeconds,
+	toEditSummary,
+	topClipAtTime,
+	type EditSummary,
+	type EditTrack,
+	type EditTrackType,
+	type ProjectEdit,
+	type TimelineClip,
+} from "@/lib/edit-core"
 
 /** `storage/projects/{projectId}/edits/{editId}/edit.json` */
 export const EDITS_DIR_NAME = "edits"
-
-export const DEFAULT_EDIT_FPS = 30
-export const DEFAULT_VIDEO_TRACK_ID = "track-video-1"
-
-export type EditTrackType = "video" | "audio"
-
-export type EditTrack = {
-	id: string
-	type: EditTrackType
-	label: string
-}
-
-/** One clip placed on the timeline (file lives in project `clips/`). */
-export type TimelineClip = {
-	id: string
-	clipFile: string
-	trackId: string
-	/** Where this clip starts on the sequence timeline (seconds). */
-	startOnTimeline: number
-	/** Trim in-point within the clip file (seconds). */
-	sourceIn: number
-	/** Trim out-point within the clip file (seconds). */
-	sourceOut: number
-}
-
-export type ProjectEdit = {
-	id: string
-	projectId: string
-	name: string
-	createdAt: string
-	updatedAt: string
-	fps: number
-	/** Sequence duration in seconds (end of last clip). */
-	duration: number
-	tracks: EditTrack[]
-	clips: TimelineClip[]
-}
-
-export type EditSummary = Pick<
-	ProjectEdit,
-	"id" | "projectId" | "name" | "createdAt" | "updatedAt" | "duration" | "fps"
-> & {
-	clipCount: number
-}
 
 const EDIT_ID_PATTERN = /^[a-zA-Z0-9_-]+$/
 
@@ -89,73 +78,6 @@ export class EditNotFoundError extends Error {
 	constructor() {
 		super("Edit not found")
 		this.name = "EditNotFoundError"
-	}
-}
-
-export function roundTimelineSeconds(value: number) {
-	return Math.round(value * 1000) / 1000
-}
-
-export function clipTimelineDuration(clip: Pick<TimelineClip, "sourceIn" | "sourceOut">) {
-	return Math.max(0, roundTimelineSeconds(clip.sourceOut - clip.sourceIn))
-}
-
-export function computeEditDuration(
-	clips: Pick<TimelineClip, "startOnTimeline" | "sourceIn" | "sourceOut">[]
-) {
-	let maxEnd = 0
-	for (const clip of clips) {
-		const end = clip.startOnTimeline + clipTimelineDuration(clip)
-		maxEnd = Math.max(maxEnd, end)
-	}
-	return roundTimelineSeconds(maxEnd)
-}
-
-export function defaultVideoTrack(): EditTrack {
-	return {
-		id: DEFAULT_VIDEO_TRACK_ID,
-		type: "video",
-		label: "Video 1",
-	}
-}
-
-export function normalizeTimelineClip(raw: TimelineClip): TimelineClip {
-	const sourceIn = roundTimelineSeconds(Math.max(0, raw.sourceIn))
-	let sourceOut = roundTimelineSeconds(Math.max(sourceIn + 0.001, raw.sourceOut))
-
-	return {
-		id: raw.id,
-		clipFile: raw.clipFile,
-		trackId: raw.trackId,
-		startOnTimeline: roundTimelineSeconds(Math.max(0, raw.startOnTimeline)),
-		sourceIn,
-		sourceOut,
-	}
-}
-
-export function normalizeProjectEdit(edit: ProjectEdit): ProjectEdit {
-	const clips = edit.clips.map(normalizeTimelineClip)
-	const duration = computeEditDuration(clips)
-
-	return {
-		...edit,
-		fps: edit.fps > 0 ? edit.fps : DEFAULT_EDIT_FPS,
-		clips,
-		duration,
-		updatedAt: edit.updatedAt,
-	}
-}
-
-export function toEditSummary(edit: ProjectEdit): EditSummary {
-	return {
-		id: edit.id,
-		projectId: edit.projectId,
-		name: edit.name,
-		createdAt: edit.createdAt,
-		updatedAt: edit.updatedAt,
-		duration: edit.duration,
-		fps: edit.fps,
-		clipCount: edit.clips.length,
 	}
 }
 
@@ -207,7 +129,7 @@ export function createEditFromManifest(
 		updatedAt: now,
 		fps: DEFAULT_EDIT_FPS,
 		duration: 0,
-		tracks: [defaultVideoTrack()],
+		tracks: [defaultVideoTrack(), defaultVideoTrack2()],
 		clips,
 	}
 
@@ -314,11 +236,19 @@ export async function createEdit(
 		throw new ProjectNotFoundError()
 	}
 
-	const edit = createEditFromManifest(projectId, manifest, {
+	let edit = createEditFromManifest(projectId, manifest, {
 		name: options?.name,
 		clipFiles:
 			options?.seedFromManifest === false ? [] : options?.clipFiles,
 	})
+
+	if (options?.seedFromManifest === false) {
+		edit = normalizeProjectEdit({
+			...edit,
+			clips: [],
+			tracks: [defaultVideoTrack(), defaultVideoTrack2()],
+		})
+	}
 
 	return writeEdit(edit)
 }
