@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useParams } from "next/navigation"
+import  FileBrowser  from "@/components/FileBrowser"
 
 type Props = {
 	params: {
@@ -152,6 +153,19 @@ export default function ProjectFilesPage({ params }: Props) {
 					</div>
 				)}
 
+			<a
+				href={`/project/${projectId}/settings`}
+				disabled={uploadStatus < 100}
+				className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+			>
+				Continue
+			</a>
+
+
+				<h2 className="text-4xl font-bold text-white mt-10">
+					Uploaded Files (todo)
+				</h2>
+				<FileBrowser id={projectId} />
 			</main>
 
 		</div>
