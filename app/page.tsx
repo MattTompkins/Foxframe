@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import Image from 'next/image'
 import { CirclePlus } from "lucide-react"
 
 type Project = {
@@ -54,11 +55,12 @@ export default function Home() {
 
 			<main className="flex w-full max-w-3xl flex-col items-center justify-between py-32 sm:items-start">
 
+				<Image src="/fox-logo.png" alt="Foxframe Logo" width={140} height={140}/>
 				<h1 className="text-6xl font-bold text-white">
 					Welcome to{" "}
 					<a
 						href="https://foxframe.dev"
-						className="text-blue-500"
+						className="text-orange-600"
 					>
 						Foxframe
 					</a>
@@ -78,9 +80,9 @@ export default function Home() {
 
 					<Link
 						href="/project/create"
-						className="flex h-60 items-center justify-center rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 hover:bg-gray-700"
+						className="flex h-60 items-center justify-center rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 hover:border-orange-600/50 hover:bg-gray-700"
 					>
-						<CirclePlus className="mr-2 h-8 w-8 text-gray-300" />
+						<CirclePlus className="mr-2 h-8 w-8 text-orange-500" />
 
 						<span className="font-medium text-white">
 							Create new project
@@ -98,7 +100,7 @@ export default function Home() {
 						<Link
 							key={project.id}
 							href={`/project/${project.slug}`}
-							className="flex h-60 flex-col items-center justify-center rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 hover:bg-gray-700"
+							className="flex h-60 flex-col items-center justify-center rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 hover:border-orange-600/40 hover:bg-gray-700"
 						>
 							<span className="text-lg font-semibold text-white">
 								{project.name}

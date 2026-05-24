@@ -112,7 +112,7 @@ export default function ProjectFilesPage({ params }: Props) {
 						<input
 							type="checkbox"
 							checked={renumberFilesOption}
-							className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+							className="h-5 w-5 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
 							onChange={(e) =>
 								setRenumberFilesOption(e.target.checked)
 							}
@@ -127,7 +127,7 @@ export default function ProjectFilesPage({ params }: Props) {
 					onDragLeave={handleDragLeave}
 					onDrop={handleDrop}
 					className={`mt-6 h-60 w-full rounded-lg border-2 border-dashed transition-colors ${isDragging
-							? "border-blue-500 bg-blue-500/10"
+							? "border-orange-500 bg-orange-500/10"
 							: "border-gray-700 bg-gray-800 hover:bg-gray-700"
 						}`}
 				>
@@ -159,7 +159,7 @@ export default function ProjectFilesPage({ params }: Props) {
 				</div>
 
 				<div className="w-full bg-zinc-700 rounded-full h-2 mt-5">
-					<div className="bg-blue-500 h-2 rounded-full" style={{ width: `${uploadStatus}%` }}></div>
+					<div className="bg-orange-500 h-2 rounded-full" style={{ width: `${uploadStatus}%` }}></div>
 				</div>
 
 				{error && (
@@ -171,7 +171,7 @@ export default function ProjectFilesPage({ params }: Props) {
 			<a
 				href={`/project/${projectId}/settings`}
 				disabled={uploadStatus < 100}
-				className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+				className="mt-4 px-6 py-3 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
 			>
 				Continue
 			</a>

@@ -54,7 +54,7 @@ return (
 			<input
 				type="text"
 				placeholder="Project Name"
-				className="px-4 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+				className="px-4 py-2 w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
 				value={projectName}
 				onChange={(e) => setProjectName(e.target.value)}
 			/>
@@ -64,7 +64,7 @@ return (
 			<button
 				onClick={createProject}
 				disabled={loading}
-				className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+				className="mt-4 px-6 py-3 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
 			>
 				{loading ? "Creating project..." : "Continue"}
 			</button>

@@ -67,7 +67,7 @@ function AspectRatioPreview({ ratio }: { ratio: AspectRatio }) {
 	return (
 		<div className="flex items-center gap-3 rounded-lg border border-zinc-600 bg-zinc-900/80 px-4 py-3">
 			<div
-				className={`shrink-0 rounded border-2 border-dashed border-blue-400 bg-blue-500/20 ${sizes[ratio]}`}
+				className={`shrink-0 rounded border-2 border-dashed border-orange-400 bg-orange-500/20 ${sizes[ratio]}`}
 				aria-hidden
 			/>
 			<p className="text-sm text-zinc-400">
@@ -232,7 +232,7 @@ export default function ProjectSettingsPage() {
 										key={opt.value}
 										className={`flex cursor-pointer flex-col rounded-lg border px-4 py-3 transition-colors ${
 											settings.framingMode === opt.value
-												? "border-blue-500 bg-blue-500/10"
+												? "border-orange-500 bg-orange-500/10"
 												: "border-zinc-600 bg-zinc-900 hover:border-zinc-500"
 										}`}
 									>
@@ -243,7 +243,7 @@ export default function ProjectSettingsPage() {
 												value={opt.value}
 												checked={settings.framingMode === opt.value}
 												onChange={() => update("framingMode", opt.value)}
-												className="accent-blue-500"
+												className="accent-orange-500"
 											/>
 											<span className="font-medium text-white">{opt.title}</span>
 										</span>
@@ -270,7 +270,7 @@ export default function ProjectSettingsPage() {
 									)
 									if (match) update("outputResolution", match.value)
 								}}
-								className="w-full rounded-lg mb-2 border border-zinc-600 bg-zinc-900 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+								className="w-full rounded-lg mb-2 border border-zinc-600 bg-zinc-900 px-4 py-3 text-white focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
 							>
 								<option value="9:16">9:16 — Vertical (phone / Reels / Shorts)</option>
 								<option value="1:1">1:1 — Square (Instagram feed, some ads)</option>
@@ -309,7 +309,7 @@ export default function ProjectSettingsPage() {
 											key={opt.value}
 											className={`flex flex-1 cursor-pointer flex-col rounded-lg border px-4 py-3 transition-colors ${
 												settings.cropMode === opt.value
-													? "border-blue-500 bg-blue-500/10"
+													? "border-orange-500 bg-orange-500/10"
 													: "border-zinc-600 bg-zinc-900 hover:border-zinc-500"
 											}`}
 										>
@@ -320,7 +320,7 @@ export default function ProjectSettingsPage() {
 													value={opt.value}
 													checked={settings.cropMode === opt.value}
 													onChange={() => update("cropMode", opt.value)}
-													className="accent-blue-500"
+													className="accent-orange-500"
 												/>
 												<span className="font-medium text-white">{opt.title}</span>
 											</span>
@@ -343,7 +343,7 @@ export default function ProjectSettingsPage() {
 								onChange={(e) =>
 									update("outputResolution", e.target.value as OutputResolution)
 								}
-								className="w-full rounded-lg border border-zinc-600 bg-zinc-900 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+								className="w-full rounded-lg border border-zinc-600 bg-zinc-900 px-4 py-3 text-white focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
 							>
 								{filteredResolutions.map((opt) => (
 									<option key={opt.value} value={opt.value}>
@@ -370,7 +370,7 @@ export default function ProjectSettingsPage() {
 								step={0.01}
 								value={settings.lensK1}
 								onChange={(e) => update("lensK1", parseFloat(e.target.value))}
-								className="w-full accent-blue-500"
+								className="w-full accent-orange-500"
 							/>
 							<div className="flex justify-between text-xs text-zinc-500">
 								<span>−0.50 (fix bulging edges)</span>
@@ -391,7 +391,7 @@ export default function ProjectSettingsPage() {
 								step={0.01}
 								value={settings.lensK2}
 								onChange={(e) => update("lensK2", parseFloat(e.target.value))}
-								className="w-full accent-blue-500"
+								className="w-full accent-orange-500"
 							/>
 							<div className="flex justify-between text-xs text-zinc-500">
 								<span>−0.50</span>
@@ -415,7 +415,7 @@ export default function ProjectSettingsPage() {
 									type="checkbox"
 									checked={settings.autoRotate}
 									onChange={(e) => update("autoRotate", e.target.checked)}
-									className="mt-1 h-4 w-4 accent-blue-500"
+									className="mt-1 h-4 w-4 accent-orange-500"
 								/>
 								<span className="flex flex-col gap-1">
 									<span className="font-medium text-white">
@@ -445,7 +445,7 @@ export default function ProjectSettingsPage() {
 								onChange={(e) =>
 									update("outputFormat", e.target.value as OutputFormat)
 								}
-								className="w-full rounded-lg border border-zinc-600 bg-zinc-900 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+								className="w-full rounded-lg border border-zinc-600 bg-zinc-900 px-4 py-3 text-white focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
 							>
 								<option value="mp4">MP4 — Best for sharing and uploading</option>
 								<option value="mov">MOV — Apple / QuickTime style</option>
@@ -462,7 +462,7 @@ export default function ProjectSettingsPage() {
 								onChange={(e) =>
 									update("outputCodec", e.target.value as OutputCodec)
 								}
-								className="w-full rounded-lg border border-zinc-600 bg-zinc-900 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+								className="w-full rounded-lg border border-zinc-600 bg-zinc-900 px-4 py-3 text-white focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
 							>
 								<option value="h264">H.264 — Maximum compatibility</option>
 								<option value="h265">H.265 (HEVC) — Smaller files, newer devices</option>
@@ -481,7 +481,7 @@ export default function ProjectSettingsPage() {
 								step={1}
 								value={settings.crf}
 								onChange={(e) => update("crf", parseInt(e.target.value, 10))}
-								className="w-full accent-blue-500"
+								className="w-full accent-orange-500"
 							/>
 							<div className="flex justify-between text-xs text-zinc-500">
 								<span>15 (largest / best)</span>
@@ -501,7 +501,7 @@ export default function ProjectSettingsPage() {
 						<button
 							type="submit"
 							disabled={loading || saving}
-							className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
+							className="rounded-lg bg-orange-600 px-6 py-3 font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
 						>
 							{saving ? "Saving…" : "Save & continue"}
 						</button>

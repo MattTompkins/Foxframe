@@ -10,6 +10,11 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Brand accent — use bg-primary, text-primary, etc. */
+  --color-primary: var(--color-orange-500);
+  --color-primary-hover: var(--color-orange-600);
+  --color-primary-muted: var(--color-orange-400);
 }
 
 @media (prefers-color-scheme: dark) {

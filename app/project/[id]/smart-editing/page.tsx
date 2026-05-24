@@ -62,7 +62,7 @@ function SettingField({
 }
 
 const inputClassName =
-	"w-full rounded-lg border border-zinc-600 bg-zinc-900 px-4 py-3 text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+	"w-full rounded-lg border border-zinc-600 bg-zinc-900 px-4 py-3 text-white focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/40 disabled:cursor-not-allowed disabled:opacity-60"
 
 export default function SmartEditingPage() {
 	const projectId = useParams().id as string
@@ -228,7 +228,7 @@ export default function SmartEditingPage() {
 									type="checkbox"
 									checked={settings.enabled}
 									onChange={(e) => update("enabled", e.target.checked)}
-									className="mt-1 h-4 w-4 accent-blue-500"
+									className="mt-1 h-4 w-4 accent-orange-500"
 								/>
 								<span className="flex flex-col gap-1">
 									<span className="font-medium text-white">
@@ -270,7 +270,7 @@ export default function SmartEditingPage() {
 											update("maxClipLengthSeconds", value)
 										}
 									}}
-									className="w-full accent-blue-500"
+									className="w-full accent-orange-500"
 								/>
 							</SettingField>
 
@@ -294,7 +294,7 @@ export default function SmartEditingPage() {
 											update("minClipLengthSeconds", value)
 										}
 									}}
-									className="w-full accent-blue-500"
+									className="w-full accent-orange-500"
 								/>
 							</SettingField>
 						</div>
@@ -315,7 +315,7 @@ export default function SmartEditingPage() {
 								onChange={(e) =>
 									update("clipsPerSourceFile", parseInt(e.target.value, 10))
 								}
-								className="w-full accent-blue-500"
+								className="w-full accent-orange-500"
 							/>
 							<div className="flex justify-between text-xs text-zinc-500">
 								<span>1 clip</span>
@@ -387,7 +387,7 @@ export default function SmartEditingPage() {
 										parseInt(e.target.value, 10)
 									)
 								}
-								className="w-full accent-blue-500"
+								className="w-full accent-orange-500"
 							/>
 							<div className="flex justify-between text-xs text-zinc-500">
 								<span>Key moment detection</span>
@@ -426,7 +426,7 @@ export default function SmartEditingPage() {
 										key={opt.value}
 										className={`flex flex-1 cursor-pointer flex-col rounded-lg border px-4 py-3 transition-colors ${
 											settings.clipDistribution === opt.value
-												? "border-blue-500 bg-blue-500/10"
+												? "border-orange-500 bg-orange-500/10"
 												: "border-zinc-600 bg-zinc-900 hover:border-zinc-500"
 										} ${editingDisabled ? "pointer-events-none opacity-60" : ""}`}
 									>
@@ -440,7 +440,7 @@ export default function SmartEditingPage() {
 												onChange={() =>
 													update("clipDistribution", opt.value)
 												}
-												className="accent-blue-500"
+												className="accent-orange-500"
 											/>
 											<span className="font-medium text-white">
 												{opt.title}
@@ -511,7 +511,7 @@ export default function SmartEditingPage() {
 						<button
 							type="submit"
 							disabled={loading || saving}
-							className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
+							className="rounded-lg bg-orange-600 px-6 py-3 font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
 						>
 							{saving
 								? "Saving…"

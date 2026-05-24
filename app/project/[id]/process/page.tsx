@@ -47,7 +47,7 @@ function FileStatusIcon({ file }: { file: FileProcessStatus }) {
 			return <XCircle className="h-5 w-5 shrink-0 text-red-400" />
 		case "encoding":
 		case "analysing":
-			return <Loader2 className="h-5 w-5 shrink-0 animate-spin text-blue-400" />
+			return <Loader2 className="h-5 w-5 shrink-0 animate-spin text-orange-400" />
 		default:
 			return <Circle className="h-5 w-5 shrink-0 text-zinc-600" />
 	}
@@ -95,7 +95,7 @@ function StageTimeline({
 									state === "complete"
 										? "border-green-500 bg-green-500/15 text-green-400"
 										: state === "active"
-											? "border-blue-500 bg-blue-500/15 text-blue-400"
+											? "border-orange-500 bg-orange-500/15 text-orange-400"
 											: isError
 												? "border-red-500 bg-red-500/15 text-red-400"
 												: "border-zinc-600 bg-zinc-800 text-zinc-500"
@@ -128,7 +128,7 @@ function StageTimeline({
 							>
 								{stage.label}
 								{state === "active" && !isError && (
-									<span className="ml-2 text-sm font-normal text-blue-400">
+									<span className="ml-2 text-sm font-normal text-orange-400">
 										In progress…
 									</span>
 								)}
@@ -339,7 +339,7 @@ export default function ProcessVideoPage() {
 									? "bg-red-500"
 									: isDone
 										? "bg-green-500"
-										: "bg-blue-500"
+										: "bg-orange-500"
 							}`}
 							style={{ width: `${status?.overallProgress ?? 0}%` }}
 						/>
@@ -369,7 +369,7 @@ export default function ProcessVideoPage() {
 						{isDone ? (
 							<Link
 								href={`/project/${projectId}/files`}
-								className="rounded-lg block bg-blue-600 px-6 py-3 text-center font-medium mb-4 text-white hover:bg-blue-700"
+								className="rounded-lg block bg-orange-600 px-6 py-3 text-center font-medium mb-4 text-white hover:bg-orange-700"
 							>
 								Proceed to editor
 							</Link>
@@ -424,7 +424,7 @@ export default function ProcessVideoPage() {
 										<div className="mt-3">
 											<div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-700">
 												<div
-													className="h-full rounded-full bg-blue-500 transition-all duration-300"
+													className="h-full rounded-full bg-orange-500 transition-all duration-300"
 													style={{ width: `${file.progress}%` }}
 												/>
 											</div>
@@ -440,8 +440,8 @@ export default function ProcessVideoPage() {
 				)}
 
 				{isDone && status && status.clipFiles && status.clipFiles.length > 0 && (
-					<section className="mb-8 rounded-xl border border-blue-500/30 bg-blue-500/5 p-6">
-						<h2 className="text-lg font-semibold text-blue-300">
+					<section className="mb-8 rounded-xl border border-orange-500/30 bg-orange-500/5 p-6">
+						<h2 className="text-lg font-semibold text-orange-300">
 							Short clips cut
 						</h2>
 						<p className="mt-1 text-sm text-zinc-400">
@@ -457,7 +457,7 @@ export default function ProcessVideoPage() {
 									key={file}
 									className="flex items-center gap-2 text-sm text-zinc-200"
 								>
-									<Scissors className="h-4 w-4 text-blue-400" />
+									<Scissors className="h-4 w-4 text-orange-400" />
 									{file}
 								</li>
 							))}
@@ -528,7 +528,7 @@ export default function ProcessVideoPage() {
 						)}
 						<Link
 							href={`/project/${projectId}/files`}
-							className="rounded-lg bg-blue-600 px-6 py-3 text-center font-medium text-white hover:bg-blue-700"
+							className="rounded-lg bg-orange-600 px-6 py-3 text-center font-medium text-white hover:bg-orange-700"
 						>
 							{isDone ? "Upload more files" : "View uploads"}
 						</Link>
