@@ -9,8 +9,10 @@ import {
 	Circle,
 	Clapperboard,
 	FileSearch,
+	Film,
 	Loader2,
 	RefreshCw,
+	Scissors,
 	Settings2,
 	SkipForward,
 	XCircle,
@@ -27,8 +29,10 @@ const STAGE_ICONS: Record<ProcessStage, typeof Settings2> = {
 	idle: Circle,
 	preparing: Settings2,
 	analysing: FileSearch,
-	processing: Clapperboard,
+	processing: Film,
 	saving: Loader2,
+	"clip-analysing": FileSearch,
+	"clip-cutting": Scissors,
 	complete: CheckCircle2,
 	error: XCircle,
 }
@@ -174,6 +178,21 @@ export default function ProcessVideoPage() {
 		}
 	}, [projectId])
 
+	const startReclip = useCallback(async () => {
+		const response = await fetch(`/api/projects/${projectId}/reclip`, {
+			method: "POST",
+		})
+
+		if (response.status === 409) {
+			return
+		}
+
+		if (!response.ok && response.status !== 202) {
+			const data = await response.json().catch(() => ({}))
+			throw new Error(data.error ?? "Failed to start re-clipping")
+		}
+	}, [projectId])
+
 	const startPolling = useCallback(() => {
 		if (pollRef.current) clearInterval(pollRef.current)
 
@@ -244,6 +263,21 @@ export default function ProcessVideoPage() {
 		}
 	}, [fetchStatus, startProcessing, startPolling])
 
+	async function handleReclip() {
+		try {
+			setStarting(true)
+			setError(null)
+			setStatus(null)
+			await startReclip()
+			await fetchStatus()
+			startPolling()
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to re-run clipping")
+		} finally {
+			setStarting(false)
+		}
+	}
+
 	async function handleRetry() {
 		try {
 			setStarting(true)
@@ -262,12 +296,14 @@ export default function ProcessVideoPage() {
 	const currentStage = status?.stage ?? "preparing"
 	const isDone = currentStage === "complete"
 	const isFailed = currentStage === "error"
+	const isReclipping = currentStage === "clip-analysing" || currentStage === "clip-cutting"
+	const canReclip = Boolean(status?.outputFiles && status.outputFiles.length > 0)
 
 	return (
 		<div className="flex min-h-full flex-1 flex-col bg-zinc-900 font-sans">
 			<main className="mx-auto flex w-full max-w-3xl flex-col px-6 py-16 sm:py-24">
 				<header className="mb-10">
-					<StepCounter current={3} total={4} stepName="Video formatting & processing" />
+					<StepCounter current={4} total={4} stepName="Video formatting & processing" />
 					<h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">
 						{isDone
 							? "Your videos are ready"
@@ -350,6 +386,8 @@ export default function ProcessVideoPage() {
 					</div>
 				</section>
 
+				
+
 				{status && status.files.length > 0 && (
 					<section className="mb-8 rounded-xl border border-zinc-700 bg-zinc-800/50 p-6">
 						<h2 className="text-lg font-semibold text-white">Source files</h2>
@@ -401,10 +439,36 @@ export default function ProcessVideoPage() {
 					</section>
 				)}
 
+				{isDone && status && status.clipFiles && status.clipFiles.length > 0 && (
+					<section className="mb-8 rounded-xl border border-blue-500/30 bg-blue-500/5 p-6">
+						<h2 className="text-lg font-semibold text-blue-300">
+							Short clips cut
+						</h2>
+						<p className="mt-1 text-sm text-zinc-400">
+							Smart editing clips are stored in your project&apos;s{" "}
+							<code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200">
+								clips/
+							</code>{" "}
+							folder.
+						</p>
+						<ul className="mt-4 flex flex-col gap-2">
+							{status.clipFiles.map((file) => (
+								<li
+									key={file}
+									className="flex items-center gap-2 text-sm text-zinc-200"
+								>
+									<Scissors className="h-4 w-4 text-blue-400" />
+									{file}
+								</li>
+							))}
+						</ul>
+					</section>
+				)}
+
 				{isDone && status && status.outputFiles.length > 0 && (
 					<section className="mb-8 rounded-xl border border-green-500/30 bg-green-500/5 p-6">
 						<h2 className="text-lg font-semibold text-green-300">
-							Output files saved
+							Processed & formatted files saved
 						</h2>
 						<p className="mt-1 text-sm text-zinc-400">
 							Processed videos are stored in your project&apos;s{" "}
@@ -429,13 +493,26 @@ export default function ProcessVideoPage() {
 
 				<div className="flex flex-col gap-4 border-t border-zinc-700 pt-8 sm:flex-row sm:items-center sm:justify-between">
 					<Link
-						href={`/project/${projectId}/settings`}
-						className="text-center text-sm text-zinc-400 underline-offset-2 hover:text-white hover:underline"
-					>
-						← Back to settings
+						href={`/project/${projectId}/smart-editing`}
+							className="text-center text-sm text-zinc-400 underline-offset-2 hover:text-white hover:underline"
+						>
+							← Back to smart editing
 					</Link>
 
 					<div className="flex flex-col gap-3 sm:flex-row">
+						{isDone && canReclip && (
+							<button
+								type="button"
+								onClick={handleReclip}
+								disabled={starting || isReclipping}
+								className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-600 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								<RefreshCw
+									className={`h-4 w-4 ${starting || isReclipping ? "animate-spin" : ""}`}
+								/>
+								Re-run clipping
+							</button>
+						)}
 						{isFailed && (
 							<button
 								type="button"

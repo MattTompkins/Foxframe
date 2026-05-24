@@ -9,6 +9,7 @@ import {
 	Settings2,
 	XCircle,
 	FolderCheck,
+	Scissors,
 } from "lucide-react"
 
 export type ProcessStage =
@@ -17,6 +18,8 @@ export type ProcessStage =
 	| "analysing"
 	| "processing"
 	| "saving"
+	| "clip-analysing"
+	| "clip-cutting"
 	| "complete"
 	| "error"
 
@@ -47,6 +50,7 @@ export type ProcessStatus = {
 	failedAtStage?: ProcessStage
 	files: FileProcessStatus[]
 	outputFiles: string[]
+	clipFiles?: string[]
 }
 
 export const INITIAL_PROCESS_STATUS: ProcessStatus = {
@@ -79,22 +83,36 @@ export const PIPELINE_STAGES: StageMeta[] = [
 	},
 	{
 		id: "processing",
-		label: "Processing videos",
+		label: "Processing video formatting",
 		description:
 			"Applying lens correction, reframing to your aspect ratio, and correctly encoding each clip.",
 		icon: Video,
 	},
 	{
 		id: "saving",
-		label: "Saving processed videos",
+		label: "Saving formatted video clips",
 		description:
 			"Writing encoded files to disk and updating your project manifest.",
 		icon: FolderCheck,
 	},
 	{
+		id: "clip-analysing",
+		label: "Analysing key moments",
+		description:
+			"Scoring motion, audio, and scene changes to find the best clip start points.",
+		icon: FileSearch,
+	},
+	{
+		id: "clip-cutting",
+		label: "Cutting short clips",
+		description:
+			"Extracting the top-scoring segments as shorter clips using your length rules.",
+		icon: Scissors,
+	},
+	{
 		id: "complete",
 		label: "Complete",
-		description: "All videos have been processed and are ready to use.",
+		description: "All videos have been processed and clips are ready to use.",
 		icon: CheckCircle2,
 	},
 ]

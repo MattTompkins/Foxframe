@@ -125,7 +125,7 @@ export async function patchProcessStatus(
 }
 
 export function isProcessing(status: ProcessStatus) {
-	return ["preparing", "analysing", "processing", "saving"].includes(
+	return ["preparing", "analysing", "processing", "saving", "clip-analysing", "clip-cutting"].includes(
 		status.stage
 	)
 }

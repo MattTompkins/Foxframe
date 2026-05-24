@@ -1,7 +1,7 @@
 import { spawn } from "child_process"
 import fs from "fs/promises"
 import path from "path"
-import { readManifest, writeManifest, PROJECTS_DIR, getVideoSettingsFromManifest } from "@/lib/manifest"
+import { readManifest, writeManifest, PROJECTS_DIR, getVideoSettingsFromManifest, getSmartEditingSettingsFromManifest } from "@/lib/manifest"
 import {
 	readProcessStatus,
 	updateProcessStatus,
@@ -15,6 +15,8 @@ import {
 } from "@/lib/framing"
 
 import { filterVideoFiles } from "@/lib/video-files"
+import { processSmartClips } from "@/lib/smart-clip-processor"
+import { CLIP_SEGMENT_LEGEND } from "@/lib/clip-segments"
 
 type VideoProbe = {
 	width: number
@@ -204,13 +206,14 @@ async function setStatus(
 
 export async function processProjectVideos(projectId: string) {
 	const existing = await readProcessStatus(projectId)
-	if (["preparing", "analysing", "processing", "saving"].includes(existing.stage)) {
+	if (["preparing", "analysing", "processing", "saving", "clip-analysing", "clip-cutting"].includes(existing.stage)) {
 		return
 	}
 
 	const startedAt = new Date().toISOString()
 	const projectDir = path.join(PROJECTS_DIR, projectId)
 	const processedDir = path.join(projectDir, "processed")
+	const clipsDir = path.join(projectDir, "clips")
 
 	await writeProcessStatus(projectId, {
 		stage: "preparing",
@@ -222,6 +225,7 @@ export async function processProjectVideos(projectId: string) {
 		currentFile: undefined,
 		files: [],
 		outputFiles: [],
+		clipFiles: [],
 	})
 
 	try {
@@ -348,7 +352,7 @@ export async function processProjectVideos(projectId: string) {
 				}
 				lastProgressWrite = now
 
-				const fileWeight = 65 / totalFiles
+				const fileWeight = 55 / totalFiles
 				const baseProgress = 25 + i * fileWeight
 				const overallProgress = Math.round(
 					baseProgress + (progress / 100) * fileWeight
@@ -376,20 +380,49 @@ export async function processProjectVideos(projectId: string) {
 
 		await setStatus(projectId, {
 			stage: "saving",
-			overallProgress: 92,
+			overallProgress: 82,
 			message: "Saving processed videos…",
 			currentFile: undefined,
 		})
 
 		manifest.processedFiles = outputFiles
+
+		const smartEditing = getSmartEditingSettingsFromManifest(manifest)
+		let clipFiles: string[] = []
+
+		if (smartEditing.enabled) {
+			const { clipFiles: generatedClips, segments } = await processSmartClips({
+				projectId,
+				processedDir,
+				clipsDir,
+				processedFiles: outputFiles,
+				smartEditing,
+				onStatus: (patch) => setStatus(projectId, patch),
+			})
+
+			clipFiles = generatedClips
+			manifest.clips = clipFiles
+			manifest.clipSegments = segments
+			manifest.clipSegmentLegend = CLIP_SEGMENT_LEGEND
+		} else {
+			manifest.clips = []
+			manifest.clipSegments = []
+			delete manifest.clipSegmentLegend
+		}
+
 		await writeManifest(projectId, manifest)
+
+		const completeMessage = smartEditing.enabled
+			? `Processed ${outputFiles.length} video(s) and cut ${clipFiles.length} short clip(s).`
+			: `Successfully processed ${outputFiles.length} video(s).`
 
 		await setStatus(projectId, {
 			stage: "complete",
 			overallProgress: 100,
 			completedAt: new Date().toISOString(),
-			message: `Successfully processed ${outputFiles.length} video(s).`,
+			message: completeMessage,
 			outputFiles,
+			clipFiles,
 			currentFile: undefined,
 		})
 	} catch (error) {
@@ -415,6 +448,120 @@ export async function processProjectVideos(projectId: string) {
 			})
 		} catch (statusError) {
 			console.error("Failed to write error status:", statusError)
+		}
+	}
+}
+
+export async function reclipProjectVideos(projectId: string) {
+	const existing = await readProcessStatus(projectId)
+	if (
+		[
+			"preparing",
+			"analysing",
+			"processing",
+			"saving",
+			"clip-analysing",
+			"clip-cutting",
+		].includes(existing.stage)
+	) {
+		return
+	}
+
+	const projectDir = path.join(PROJECTS_DIR, projectId)
+	const processedDir = path.join(projectDir, "processed")
+	const clipsDir = path.join(projectDir, "clips")
+
+	await writeProcessStatus(projectId, {
+		stage: "clip-analysing",
+		startedAt: new Date().toISOString(),
+		completedAt: undefined,
+		overallProgress: 84,
+		message: "Re-running clip selection with your latest smart editing settings…",
+		error: undefined,
+		currentFile: undefined,
+		outputFiles: existing.outputFiles ?? [],
+		clipFiles: [],
+	})
+
+	try {
+		const manifest = await readManifest(projectId)
+		if (!manifest) {
+			throw new Error("Project not found")
+		}
+
+		const processedFiles = manifest.processedFiles ?? []
+		if (processedFiles.length === 0) {
+			throw new Error(
+				"No processed videos found. Run full processing first before re-clipping."
+			)
+		}
+
+		for (const fileName of processedFiles) {
+			try {
+				await fs.access(path.join(processedDir, fileName))
+			} catch {
+				throw new Error(
+					`Processed file missing on disk: ${fileName}. Run full processing again.`
+				)
+			}
+		}
+
+		await fs.rm(clipsDir, { recursive: true, force: true })
+		await fs.mkdir(clipsDir, { recursive: true })
+
+		const smartEditing = getSmartEditingSettingsFromManifest(manifest)
+		let clipFiles: string[] = []
+
+		if (smartEditing.enabled) {
+			const { clipFiles: generatedClips, segments } = await processSmartClips({
+				projectId,
+				processedDir,
+				clipsDir,
+				processedFiles,
+				smartEditing,
+				onStatus: (patch) => setStatus(projectId, patch),
+			})
+
+			clipFiles = generatedClips
+			manifest.clips = clipFiles
+			manifest.clipSegments = segments
+			manifest.clipSegmentLegend = CLIP_SEGMENT_LEGEND
+		} else {
+			manifest.clips = []
+			manifest.clipSegments = []
+			delete manifest.clipSegmentLegend
+		}
+
+		await writeManifest(projectId, manifest)
+
+		const completeMessage = smartEditing.enabled
+			? `Re-cut ${clipFiles.length} short clip(s) from ${processedFiles.length} processed video(s).`
+			: "Smart editing disabled - existing clips cleared."
+
+		await setStatus(projectId, {
+			stage: "complete",
+			overallProgress: 100,
+			completedAt: new Date().toISOString(),
+			message: completeMessage,
+			outputFiles: processedFiles,
+			clipFiles,
+			currentFile: undefined,
+		})
+	} catch (error) {
+		const message =
+			error instanceof Error ? error.message : "Re-clipping failed unexpectedly"
+
+		try {
+			const current = await readProcessStatus(projectId)
+			await setStatus(projectId, {
+				stage: "error",
+				failedAtStage: "clip-cutting",
+				error: message,
+				message,
+				completedAt: new Date().toISOString(),
+			})
+		} catch (statusError) {
+			console.error("Failed to write reclip error status:", statusError)
 		}
 	}
 }

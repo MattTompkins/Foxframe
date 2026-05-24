@@ -138,7 +138,7 @@ export default function ProjectSettingsPage() {
 
 			const data = await response.json()
 
-			window.location.href = `/project/${projectId}/process`
+			window.location.href = `/project/${projectId}/smart-editing`
 
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to save settings")
@@ -503,9 +503,7 @@ export default function ProjectSettingsPage() {
 							disabled={loading || saving}
 							className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
 						>
-							{saving
-								? "Saving…"
-								: "Save settings & begin processing"}
+							{saving ? "Saving…" : "Save & continue"}
 						</button>
 					</div>
 				</form>

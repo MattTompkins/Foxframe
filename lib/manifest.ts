@@ -1,6 +1,11 @@
 import fs from "fs/promises"
 import path from "path"
 import { mergeVideoSettings, type VideoSettings } from "@/lib/video-settings"
+import {
+	mergeSmartEditingSettings,
+	type SmartEditingSettings,
+} from "@/lib/smart-editing-settings"
+import { CLIP_SEGMENT_LEGEND, type ClipSegment } from "@/lib/clip-segments"
 
 export const PROJECTS_DIR = path.join(process.cwd(), "storage/projects")
 
@@ -10,7 +15,11 @@ export type Manifest = {
 	slug?: string
 	sourceFiles: string[]
 	settings?: Partial<VideoSettings>
+	smartEditing?: Partial<SmartEditingSettings>
 	processedFiles?: string[]
+	clips?: string[]
+	clipSegments?: ClipSegment[]
+	clipSegmentLegend?: typeof CLIP_SEGMENT_LEGEND
 }
 
 export function manifestPath(projectId: string) {
@@ -39,4 +48,10 @@ export function getVideoSettingsFromManifest(
 	manifest: Manifest | null
 ): VideoSettings {
 	return mergeVideoSettings(manifest?.settings)
+}
+
+export function getSmartEditingSettingsFromManifest(
+	manifest: Manifest | null
+): SmartEditingSettings {
+	return mergeSmartEditingSettings(manifest?.smartEditing)
 }
