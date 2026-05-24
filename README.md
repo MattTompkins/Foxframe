@@ -28,4 +28,4 @@ npm run setup-app -- --prepull-clip      # also download CLIP weights (~350MB)
 npm run dev
 ```
 
-CV scoring runs locally (no API keys). See `lib/py/requirements.txt` for Python details.
+CV scoring runs locally via `lib/py/cv_scorer.py` (CLIP, no API keys). Enable it on the smart editing page with the scoring blend slider above 0%. See `lib/py/requirements.txt` for Python details.

@@ -206,7 +206,18 @@ async function setStatus(
 
 export async function processProjectVideos(projectId: string) {
 	const existing = await readProcessStatus(projectId)
-	if (["preparing", "analysing", "processing", "saving", "clip-analysing", "clip-cutting"].includes(existing.stage)) {
+	if (
+		[
+			"preparing",
+			"analysing",
+			"processing",
+			"saving",
+			"clip-analysing",
+			"clip-cutting",
+			"clip-cv-scoring",
+			"clip-selecting",
+		].includes(existing.stage)
+	) {
 		return
 	}
 
@@ -391,23 +402,33 @@ export async function processProjectVideos(projectId: string) {
 		let clipFiles: string[] = []
 
 		if (smartEditing.enabled) {
-			const { clipFiles: generatedClips, segments } = await processSmartClips({
+			const {
+				clipFiles: generatedClips,
+				segments,
+				selectedClips,
+				cvScoring,
+			} = await processSmartClips({
 				projectId,
 				processedDir,
 				clipsDir,
 				processedFiles: outputFiles,
 				smartEditing,
+				existingSegments: manifest.clipSegments,
 				onStatus: (patch) => setStatus(projectId, patch),
 			})
 
 			clipFiles = generatedClips
 			manifest.clips = clipFiles
+			manifest.selectedClips = selectedClips
 			manifest.clipSegments = segments
 			manifest.clipSegmentLegend = CLIP_SEGMENT_LEGEND
+			manifest.cvScoring = cvScoring
 		} else {
 			manifest.clips = []
+			manifest.selectedClips = []
 			manifest.clipSegments = []
 			delete manifest.clipSegmentLegend
+			delete manifest.cvScoring
 		}
 
 		await writeManifest(projectId, manifest)
@@ -462,6 +483,8 @@ export async function reclipProjectVideos(projectId: string) {
 			"saving",
 			"clip-analysing",
 			"clip-cutting",
+			"clip-cv-scoring",
+			"clip-selecting",
 		].includes(existing.stage)
 	) {
 		return
@@ -479,6 +502,7 @@ export async function reclipProjectVideos(projectId: string) {
 		message: "Re-running clip selection with your latest smart editing settings…",
 		error: undefined,
 		currentFile: undefined,
+		files: existing.files ?? [],
 		outputFiles: existing.outputFiles ?? [],
 		clipFiles: [],
 	})
@@ -513,23 +537,33 @@ export async function reclipProjectVideos(projectId: string) {
 		let clipFiles: string[] = []
 
 		if (smartEditing.enabled) {
-			const { clipFiles: generatedClips, segments } = await processSmartClips({
+			const {
+				clipFiles: generatedClips,
+				segments,
+				selectedClips,
+				cvScoring,
+			} = await processSmartClips({
 				projectId,
 				processedDir,
 				clipsDir,
 				processedFiles,
 				smartEditing,
+				existingSegments: manifest.clipSegments,
 				onStatus: (patch) => setStatus(projectId, patch),
 			})
 
 			clipFiles = generatedClips
 			manifest.clips = clipFiles
+			manifest.selectedClips = selectedClips
 			manifest.clipSegments = segments
 			manifest.clipSegmentLegend = CLIP_SEGMENT_LEGEND
+			manifest.cvScoring = cvScoring
 		} else {
 			manifest.clips = []
+			manifest.selectedClips = []
 			manifest.clipSegments = []
 			delete manifest.clipSegmentLegend
+			delete manifest.cvScoring
 		}
 
 		await writeManifest(projectId, manifest)

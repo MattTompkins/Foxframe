@@ -6,12 +6,6 @@ import Link from "next/link"
 import { Modal } from "@/components/Modal"
 import { FileVideoCamera, Cog, BrainCog, Cpu, ScanEye, Clapperboard, Trash2 } from "lucide-react"
 
-type Props = {
-	params: {
-		id: string
-	}
-}
-
 type Project = {
 	id: string
 	slug: string
@@ -44,8 +38,7 @@ async function deleteProject(projectId: string) {
 	window.location.href = "/"
 }
 
-export default function projectOverview({ params }: Props) {
-
+export default function projectOverview() {
 	const [deleteModalOpen, setDeleteModalOpen] = useState(false)
 	const [deleteError, setDeleteError] = useState<string | null>(null)
 	const [deleting, setDeleting] = useState(false)

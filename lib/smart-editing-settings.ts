@@ -6,6 +6,9 @@ export type KeyMomentDetection =
 
 export type ClipDistribution = "start" | "end" | "mixed"
 
+/** Which score drives clip rank when manualFinalScore is not set on a segment */
+export type FinalScoreSource = "blended" | "signal" | "cv"
+
 export type SmartEditingSettings = {
 	enabled: boolean
 	minClipLengthSeconds: number
@@ -17,6 +20,8 @@ export type SmartEditingSettings = {
 	positivePrompt: string
 	negativePrompt: string
 	clipDistribution: ClipDistribution
+	/** Rank clips by blended average, signal only, or CV only (unless manual override on segment) */
+	finalScoreSource: FinalScoreSource
 }
 
 export const DEFAULT_SMART_EDITING_SETTINGS: SmartEditingSettings = {
@@ -29,6 +34,7 @@ export const DEFAULT_SMART_EDITING_SETTINGS: SmartEditingSettings = {
 	positivePrompt: "",
 	negativePrompt: "",
 	clipDistribution: "mixed",
+	finalScoreSource: "blended",
 }
 
 const KEY_MOMENT_DETECTION = new Set<KeyMomentDetection>([
@@ -39,6 +45,7 @@ const KEY_MOMENT_DETECTION = new Set<KeyMomentDetection>([
 ])
 
 const CLIP_DISTRIBUTION = new Set<ClipDistribution>(["start", "end", "mixed"])
+const FINAL_SCORE_SOURCE = new Set<FinalScoreSource>(["blended", "signal", "cv"])
 
 function clampInt(value: unknown, min: number, max: number, fallback: number) {
 	if (typeof value !== "number" || !Number.isInteger(value)) return fallback
@@ -115,6 +122,11 @@ export function mergeSmartEditingSettings(
 		)
 			? (partial.clipDistribution as ClipDistribution)
 			: DEFAULT_SMART_EDITING_SETTINGS.clipDistribution,
+		finalScoreSource: FINAL_SCORE_SOURCE.has(
+			partial.finalScoreSource as FinalScoreSource
+		)
+			? (partial.finalScoreSource as FinalScoreSource)
+			: DEFAULT_SMART_EDITING_SETTINGS.finalScoreSource,
 	}
 }
 

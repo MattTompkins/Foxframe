@@ -14,13 +14,19 @@ function normalizeStage(stage: string): ProcessStage {
 	return stage as ProcessStage
 }
 
-function normalizeProcessStatus(status: ProcessStatus): ProcessStatus {
+function normalizeProcessStatus(
+	status: Partial<ProcessStatus> & { stage: ProcessStage }
+): ProcessStatus {
 	return {
+		...INITIAL_PROCESS_STATUS,
 		...status,
 		stage: normalizeStage(status.stage),
 		failedAtStage: status.failedAtStage
 			? normalizeStage(status.failedAtStage)
 			: undefined,
+		files: status.files ?? [],
+		outputFiles: status.outputFiles ?? [],
+		clipFiles: status.clipFiles ?? [],
 	}
 }
 
@@ -49,7 +55,9 @@ async function readProcessStatusUnsafe(
 
 	try {
 		const raw = await fs.readFile(filePath, "utf-8")
-		return normalizeProcessStatus(JSON.parse(raw) as ProcessStatus)
+		return normalizeProcessStatus(
+			JSON.parse(raw) as Partial<ProcessStatus> & { stage: ProcessStage }
+		)
 	} catch (err: unknown) {
 		if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
 			return { ...INITIAL_PROCESS_STATUS }
@@ -125,7 +133,16 @@ export async function patchProcessStatus(
 }
 
 export function isProcessing(status: ProcessStatus) {
-	return ["preparing", "analysing", "processing", "saving", "clip-analysing", "clip-cutting"].includes(
+	return [
+		"preparing",
+		"analysing",
+		"processing",
+		"saving",
+		"clip-analysing",
+		"clip-cutting",
+		"clip-cv-scoring",
+		"clip-selecting",
+	].includes(
 		status.stage
 	)
 }

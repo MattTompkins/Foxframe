@@ -13,6 +13,8 @@ import {
 	Loader2,
 	RefreshCw,
 	Scissors,
+	ScanEye,
+	ListChecks,
 	Settings2,
 	SkipForward,
 	XCircle,
@@ -33,6 +35,8 @@ const STAGE_ICONS: Record<ProcessStage, typeof Settings2> = {
 	saving: Loader2,
 	"clip-analysing": FileSearch,
 	"clip-cutting": Scissors,
+	"clip-cv-scoring": ScanEye,
+	"clip-selecting": ListChecks,
 	complete: CheckCircle2,
 	error: XCircle,
 }
@@ -296,7 +300,11 @@ export default function ProcessVideoPage() {
 	const currentStage = status?.stage ?? "preparing"
 	const isDone = currentStage === "complete"
 	const isFailed = currentStage === "error"
-	const isReclipping = currentStage === "clip-analysing" || currentStage === "clip-cutting"
+	const isReclipping =
+		currentStage === "clip-analysing" ||
+		currentStage === "clip-cutting" ||
+		currentStage === "clip-cv-scoring" ||
+		currentStage === "clip-selecting"
 	const canReclip = Boolean(status?.outputFiles && status.outputFiles.length > 0)
 
 	return (
@@ -368,7 +376,7 @@ export default function ProcessVideoPage() {
 					<div className="mt-8">
 						{isDone ? (
 							<Link
-								href={`/project/${projectId}/files`}
+								href={`/project/${projectId}/review`}
 								className="rounded-lg block bg-orange-600 px-6 py-3 text-center font-medium mb-4 text-white hover:bg-orange-700"
 							>
 								Proceed to editor
@@ -388,14 +396,14 @@ export default function ProcessVideoPage() {
 
 				
 
-				{status && status.files.length > 0 && (
+				{(status?.files?.length ?? 0) > 0 && (
 					<section className="mb-8 rounded-xl border border-zinc-700 bg-zinc-800/50 p-6">
 						<h2 className="text-lg font-semibold text-white">Source files</h2>
 						<p className="mt-1 text-sm text-zinc-400">
 							Per-file status while lens correction, reframing, and encoding run.
 						</p>
 						<ul className="mt-5 flex flex-col gap-3">
-							{status.files.map((file) => (
+							{status!.files.map((file) => (
 								<li
 									key={file.fileName}
 									className="rounded-lg border border-zinc-600 bg-zinc-900 px-4 py-3"

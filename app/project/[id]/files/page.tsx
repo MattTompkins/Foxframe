@@ -6,18 +6,12 @@ import FileBrowser from "@/components/FileBrowser"
 import { StepCounter } from "@/components/StepCounter"
 import { isVideoFileName, VIDEO_EXTENSIONS_LABEL } from "@/lib/video-files"
 
-type Props = {
-	params: {
-		id: string
-	}
-}
-
-export default function ProjectFilesPage({ params }: Props) {
-
-	const projectId = useParams().id;
+export default function ProjectFilesPage() {
+	const projectId = useParams().id as string
 
 	const [renumberFilesOption, setRenumberFilesOption] = useState(true)
-	const [uploadStatus, setUploadStatus] = useState(0);
+	const [uploadStatus, setUploadStatus] = useState(0)
+	const [uploadRefreshKey, setUploadRefreshKey] = useState(0)
 	const [error, setError] = useState<string | null>(null)
 	const [isDragging, setIsDragging] = useState(false)
 
@@ -57,9 +51,8 @@ export default function ProjectFilesPage({ params }: Props) {
 				)
 			}
 
-			const data = await response.json()
-			console.log("Upload successful for file:", file.name, data)
-
+			await response.json()
+			setUploadRefreshKey((key) => key + 1)
 		} catch (error) {
 			console.error("Error uploading file:", file.name, error)
 			setError(
@@ -127,8 +120,8 @@ export default function ProjectFilesPage({ params }: Props) {
 					onDragLeave={handleDragLeave}
 					onDrop={handleDrop}
 					className={`mt-6 h-60 w-full rounded-lg border-2 border-dashed transition-colors ${isDragging
-							? "border-orange-500 bg-orange-500/10"
-							: "border-gray-700 bg-gray-800 hover:bg-gray-700"
+						? "border-orange-500 bg-orange-500/10"
+						: "border-gray-700 bg-gray-800 hover:bg-gray-700"
 						}`}
 				>
 
@@ -168,19 +161,15 @@ export default function ProjectFilesPage({ params }: Props) {
 					</div>
 				)}
 
-			<a
-				href={`/project/${projectId}/settings`}
-				disabled={uploadStatus < 100}
-				className="mt-4 px-6 py-3 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
-			>
-				Continue
-			</a>
+				<a
+					href={`/project/${projectId}/settings`}
+					disabled={uploadStatus < 100}
+					className="mt-4 px-6 py-3 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+				>
+					Continue
+				</a>
 
-
-				<h2 className="text-4xl font-bold text-white mt-10">
-					Uploaded Files (todo)
-				</h2>
-				<FileBrowser id={projectId} />
+				<FileBrowser projectId={projectId} refreshKey={uploadRefreshKey} />
 			</main>
 
 		</div>

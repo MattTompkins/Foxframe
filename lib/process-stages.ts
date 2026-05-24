@@ -2,7 +2,6 @@ import type { LucideIcon } from "lucide-react"
 import {
 	CheckCircle2,
 	Circle,
-	Clapperboard,
 	Video,
 	FileSearch,
 	Loader2,
@@ -10,6 +9,8 @@ import {
 	XCircle,
 	FolderCheck,
 	Scissors,
+	ScanEye,
+	ListChecks,
 } from "lucide-react"
 
 export type ProcessStage =
@@ -20,6 +21,8 @@ export type ProcessStage =
 	| "saving"
 	| "clip-analysing"
 	| "clip-cutting"
+	| "clip-cv-scoring"
+	| "clip-selecting"
 	| "complete"
 	| "error"
 
@@ -99,15 +102,29 @@ export const PIPELINE_STAGES: StageMeta[] = [
 		id: "clip-analysing",
 		label: "Analysing key moments",
 		description:
-			"Scoring motion, audio, and scene changes to find the best clip start points.",
+			"Scoring motion, audio, and scene changes to find cut points on each formatted video.",
 		icon: FileSearch,
 	},
 	{
 		id: "clip-cutting",
 		label: "Cutting short clips",
 		description:
-			"Extracting the top-scoring segments as shorter clips using your length rules.",
+			"Cutting every detected key-moment segment into its own file in clips/ (no cap at this step).",
 		icon: Scissors,
+	},
+	{
+		id: "clip-cv-scoring",
+		label: "Computer vision scoring",
+		description:
+			"Scoring every short clip in clips/ with local CLIP against your positive and negative prompts.",
+		icon: ScanEye,
+	},
+	{
+		id: "clip-selecting",
+		label: "Selecting best clips",
+		description:
+			"Ranking all short clips by your final score and marking the top picks per source file for a future combined edit.",
+		icon: ListChecks,
 	},
 	{
 		id: "complete",

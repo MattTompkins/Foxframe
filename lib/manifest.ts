@@ -6,6 +6,7 @@ import {
 	type SmartEditingSettings,
 } from "@/lib/smart-editing-settings"
 import { CLIP_SEGMENT_LEGEND, type ClipSegment } from "@/lib/clip-segments"
+import type { CvScoringMeta } from "@/lib/cv-scorer"
 
 export const PROJECTS_DIR = path.join(process.cwd(), "storage/projects")
 
@@ -18,8 +19,12 @@ export type Manifest = {
 	smartEditing?: Partial<SmartEditingSettings>
 	processedFiles?: string[]
 	clips?: string[]
+	/** Top picks by finalScore (subset of clips) for a future combined edit */
+	selectedClips?: string[]
 	clipSegments?: ClipSegment[]
 	clipSegmentLegend?: typeof CLIP_SEGMENT_LEGEND
+	/** Summary of the last CLIP scoring run on files in clips/ */
+	cvScoring?: CvScoringMeta
 }
 
 export function manifestPath(projectId: string) {

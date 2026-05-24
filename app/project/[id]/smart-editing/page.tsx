@@ -7,6 +7,7 @@ import { StepCounter } from "@/components/StepCounter"
 import {
 	DEFAULT_SMART_EDITING_SETTINGS,
 	type ClipDistribution,
+	type FinalScoreSource,
 	type KeyMomentDetection,
 	type SmartEditingSettings,
 } from "@/lib/smart-editing-settings"
@@ -394,6 +395,43 @@ export default function SmartEditingPage() {
 								<span>Balanced</span>
 								<span>Computer vision</span>
 							</div>
+						</SettingField>
+
+						<SettingField
+							label="Final score for ranking"
+							help="Which score ranks clips in the manifest when no manual override is set on a clip. Blended uses the formula above; signal or CV use that score alone."
+							example="Use blended for a balance; use manual overrides per clip in manifest.json when you want to hand-pick winners."
+							disabled={editingDisabled}
+						>
+							<select
+								value={settings.finalScoreSource}
+								disabled={editingDisabled}
+								onChange={(e) =>
+									update(
+										"finalScoreSource",
+										e.target.value as FinalScoreSource
+									)
+								}
+								className={inputClassName}
+							>
+								<option value="blended">
+									Blended — weighted average of signal and CV
+								</option>
+								<option value="signal">
+									Signal only — key-moment score
+								</option>
+								<option value="cv">
+									Computer vision only — CLIP score on clip file
+								</option>
+							</select>
+							<p className="text-xs text-zinc-500">
+								Set{" "}
+								<code className="rounded bg-zinc-800 px-1 text-zinc-300">
+									manualFinalScore
+								</code>{" "}
+								(0–1) on a clip segment in the manifest to override ranking for
+								that clip.
+							</p>
 						</SettingField>
 
 						<SettingField
