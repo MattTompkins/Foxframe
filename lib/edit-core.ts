@@ -199,3 +199,39 @@ export function timelineTimeFromVideo(
 		clip.startOnTimeline + (videoCurrentTime - clip.sourceIn)
 	)
 }
+
+function videoTrackClipBoundaries(edit: ProjectEdit): number[] {
+	const videoTrackIds = new Set(
+		edit.tracks.filter((track) => track.type === "video").map((track) => track.id)
+	)
+	const boundaries = new Set<number>()
+
+	for (const clip of edit.clips) {
+		if (!videoTrackIds.has(clip.trackId)) continue
+		boundaries.add(clip.startOnTimeline)
+		boundaries.add(clipTimelineEnd(clip))
+	}
+
+	return [...boundaries].sort((a, b) => a - b)
+}
+
+/** When program output next changes (track overlap, gap, or next clip). */
+export function resolveNextProgramChange(
+	edit: ProjectEdit,
+	timelineTime: number
+): { at: number; frame: SequencePlaybackFrame | null } | null {
+	const current = resolvePlaybackAtTime(edit, timelineTime)
+	const currentClipId = current?.clip.id ?? null
+
+	for (const boundary of videoTrackClipBoundaries(edit)) {
+		if (boundary <= timelineTime + 0.001) continue
+
+		const after = resolvePlaybackAtTime(edit, boundary + 0.0005)
+		const afterClipId = after?.clip.id ?? null
+		if (afterClipId !== currentClipId) {
+			return { at: boundary, frame: after }
+		}
+	}
+
+	return null
+}

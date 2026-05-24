@@ -10,7 +10,6 @@ import { EditorResizablePanel } from "@/components/EditorResizablePanel"
 import { EditorTimeline } from "@/components/EditorTimeline"
 import { SequencePreview } from "@/components/SequencePreview"
 import { VideoPlayer } from "@/components/VideoPlayer"
-import { useSequencePlayback } from "@/hooks/useSequencePlayback"
 import type { ClipSegment } from "@/lib/clip-segments"
 import {
 	addClipToEdit,
@@ -300,17 +299,6 @@ export default function EditorPage() {
 		})
 	}, [currentEdit, playheadSeconds])
 
-	useSequencePlayback({
-		isPlaying,
-		duration: currentEdit?.duration ?? 0,
-		onTick: (updater) => {
-			setPlayheadSeconds(updater)
-		},
-		onReachEnd: () => {
-			setIsPlaying(false)
-		},
-	})
-
 	return (
 		<div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-zinc-950 font-sans text-zinc-100">
 			<EditorHeader
@@ -416,6 +404,8 @@ export default function EditorPage() {
 							playheadSeconds={playheadSeconds}
 							isPlaying={isPlaying}
 							volume={volume}
+							onPlayheadChange={setPlayheadSeconds}
+							onReachEnd={() => setIsPlaying(false)}
 						/>
 					) : (
 						<div className="flex h-full min-h-0 flex-1 items-center justify-center bg-black">
