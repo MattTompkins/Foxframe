@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "setup-app": "node scripts/setup-app.js",
     "lint": "eslint"
   },
   "dependencies": {
