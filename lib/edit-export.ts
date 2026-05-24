@@ -9,7 +9,6 @@ import {
 	type ProjectEdit,
 } from "@/lib/edit-core"
 import { editDir, readEdit } from "@/lib/edit"
-import { cutClip } from "@/lib/clip-cutter"
 import {
 	PROJECTS_DIR,
 	getVideoSettingsFromManifest,
@@ -131,9 +130,49 @@ function clipPath(projectId: string, clipFile: string) {
 	return path.join(PROJECTS_DIR, projectId, "clips", clipFile)
 }
 
+function outputFfmpegFormatArgs(format: OutputFormat): string[] {
+	return format === "mov" ? ["-f", "mov"] : ["-f", "mp4"]
+}
+
+function tempExportPath(outputPath: string) {
+	const ext = path.extname(outputPath)
+	const base = path.basename(outputPath, ext)
+	return path.join(path.dirname(outputPath), `${base}.partial${ext}`)
+}
+
 function codecArgs(settings: VideoSettings) {
 	const videoCodec = settings.outputCodec === "h265" ? "libx265" : "libx264"
 	return ["-c:v", videoCodec, "-crf", String(settings.crf), "-c:a", "aac"]
+}
+
+const EXPORT_FPS = 30
+const EXPORT_AUDIO_RATE = 48000
+
+function scalePadFilter(settings: VideoSettings) {
+	const [width, height] = settings.outputResolution.split("x")
+	return `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black,format=yuv420p`
+}
+
+function segmentOutputArgs(settings: VideoSettings) {
+	const args = [
+		...codecArgs(settings),
+		"-pix_fmt",
+		"yuv420p",
+		"-r",
+		String(EXPORT_FPS),
+		"-ar",
+		String(EXPORT_AUDIO_RATE),
+		"-ac",
+		"2",
+		"-vsync",
+		"cfr",
+	]
+
+	if (settings.outputCodec === "h265" && settings.outputFormat === "mp4") {
+		args.push("-tag:v", "hvc1")
+	}
+
+	return args
 }
 
 async function runFfmpeg(args: string[]) {
@@ -170,17 +209,54 @@ async function createBlackSegment(
 	duration: number
 ) {
 	const [width, height] = settings.outputResolution.split("x")
+	const durationArg = duration.toFixed(3)
+
 	await runFfmpeg([
 		"-y",
 		"-f",
 		"lavfi",
 		"-i",
-		`color=c=black:s=${width}x${height}:r=30:d=${duration.toFixed(3)}`,
+		`color=c=black:s=${width}x${height}:r=${EXPORT_FPS}:d=${durationArg}`,
+		"-f",
+		"lavfi",
+		"-i",
+		`anullsrc=r=${EXPORT_AUDIO_RATE}:cl=stereo:d=${durationArg}`,
 		"-t",
-		duration.toFixed(3),
-		...codecArgs(settings),
-		"-pix_fmt",
-		"yuv420p",
+		durationArg,
+		"-map",
+		"0:v:0",
+		"-map",
+		"1:a:0",
+		...segmentOutputArgs(settings),
+		"-shortest",
+		outputPath,
+	])
+}
+
+async function renderClipSegment(
+	inputPath: string,
+	outputPath: string,
+	segment: ProgramSegment,
+	settings: VideoSettings
+) {
+	const durationArg = segment.duration.toFixed(3)
+
+	await runFfmpeg([
+		"-y",
+		"-i",
+		inputPath,
+		"-ss",
+		segment.sourceIn.toFixed(3),
+		"-t",
+		durationArg,
+		"-vf",
+		scalePadFilter(settings),
+		"-map",
+		"0:v:0",
+		"-map",
+		"0:a:0?",
+		...segmentOutputArgs(settings),
+		"-shortest",
 		outputPath,
 	])
 }
@@ -198,6 +274,8 @@ async function concatSegments(
 	await fs.writeFile(listPath, listBody)
 
 	try {
+		// Always re-encode the final mux. Stream copy often leaves broken timestamps
+		// so players show only the first clip while audio runs longer.
 		await runFfmpeg([
 			"-y",
 			"-f",
@@ -206,22 +284,14 @@ async function concatSegments(
 			"0",
 			"-i",
 			listPath,
-			"-c",
-			"copy",
-			outputPath,
-		])
-	} catch {
-		await runFfmpeg([
-			"-y",
-			"-f",
-			"concat",
-			"-safe",
-			"0",
-			"-i",
-			listPath,
-			...codecArgs(settings),
-			"-pix_fmt",
-			"yuv420p",
+			"-map",
+			"0:v:0",
+			"-map",
+			"0:a:0?",
+			...segmentOutputArgs(settings),
+			"-movflags",
+			"+faststart",
+			...outputFfmpegFormatArgs(settings.outputFormat),
 			outputPath,
 		])
 	} finally {
@@ -269,10 +339,12 @@ export async function exportEditVideo(options: {
 		if (!segment.clipFile) {
 			await createBlackSegment(segmentPath, settings, segment.duration)
 		} else {
-			const input = clipPath(projectId, segment.clipFile)
-			await cutClip(input, segmentPath, segment.sourceIn, segment.duration, {
-				accurateDuration: true,
-			})
+			await renderClipSegment(
+				clipPath(projectId, segment.clipFile),
+				segmentPath,
+				segment,
+				settings
+			)
 		}
 
 		segmentPaths.push(segmentPath)
@@ -284,7 +356,7 @@ export async function exportEditVideo(options: {
 		editId,
 		settings.outputFormat
 	)
-	const tempOutput = `${outputPath}.tmp`
+	const tempOutput = tempExportPath(outputPath)
 
 	await concatSegments(segmentPaths, tempOutput, settings)
 	await fs.rename(tempOutput, outputPath)

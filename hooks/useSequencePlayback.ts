@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react"
+import { roundTimelineSeconds } from "@/lib/edit-core"
 
 /** Advance playhead while `isPlaying` using a wall-clock RAF loop. */
 export function useSequencePlayback({
@@ -29,10 +30,10 @@ export function useSequencePlayback({
 			last = now
 
 			onTickRef.current((previous) => {
-				const next = previous + deltaSeconds
+				const next = roundTimelineSeconds(previous + deltaSeconds)
 				if (next >= duration) {
 					onReachEndRef.current()
-					return duration
+					return roundTimelineSeconds(duration)
 				}
 				return next
 			})

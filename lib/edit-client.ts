@@ -98,6 +98,17 @@ export function moveTimelineClip(
 	})
 }
 
+export function removeTimelineClip(
+	edit: ProjectEdit,
+	clipId: string
+): ProjectEdit {
+	return normalizeProjectEdit({
+		...edit,
+		clips: edit.clips.filter((clip) => clip.id !== clipId),
+		updatedAt: new Date().toISOString(),
+	})
+}
+
 export function addTrackToEdit(
 	edit: ProjectEdit,
 	type: EditTrackType

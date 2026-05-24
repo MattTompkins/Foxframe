@@ -6,10 +6,12 @@ import {
 	CLIP_DRAG_MIME,
 	addTrackToEdit,
 	moveTimelineClip,
+	removeTimelineClip,
 	snapToFrame,
 } from "@/lib/edit-client"
 import {
 	clipTimelineDuration,
+	roundTimelineSeconds,
 	type EditTrack,
 	type EditTrackType,
 	type ProjectEdit,
@@ -21,10 +23,22 @@ const RULER_HEIGHT = 28
 const TRACK_ROW_HEIGHT = 52
 const MIN_TIMELINE_SECONDS = 12
 const DEFAULT_PX_PER_SEC = 64
+const CLIP_DRAG_THRESHOLD_PX = 5
 
 type ClipDragState = {
 	clipId: string
 	pointerId: number
+	grabOffsetSec: number
+	originTrackId: string
+	previewStart: number
+	previewTrackId: string
+}
+
+type PendingClipPointer = {
+	clipId: string
+	pointerId: number
+	startClientX: number
+	startClientY: number
 	grabOffsetSec: number
 	originTrackId: string
 	previewStart: number
@@ -37,13 +51,45 @@ function basename(file: string) {
 }
 
 function formatRulerLabel(seconds: number) {
-	if (seconds < 60) return `${seconds}s`
-	const m = Math.floor(seconds / 60)
-	const s = seconds % 60
+	const t = roundTimelineSeconds(Math.max(0, seconds))
+	if (t < 60) {
+		if (Math.abs(t - Math.round(t)) < 0.05) return `${Math.round(t)}s`
+		return `${t.toFixed(1)}s`
+	}
+	const totalSec = Math.floor(t + 1e-6)
+	const m = Math.floor(totalSec / 60)
+	const s = totalSec % 60
 	return s > 0 ? `${m}:${String(s).padStart(2, "0")}` : `${m}:00`
 }
 
-function trackClipColor(track: EditTrack, index: number, isDragging: boolean) {
+function formatPlayheadTime(seconds: number, fps: number) {
+	const t =
+		fps > 0
+			? roundTimelineSeconds(Math.max(0, Math.round(seconds * fps) / fps))
+			: roundTimelineSeconds(Math.max(0, seconds))
+	const totalSec = Math.floor(t + 1e-6)
+	const m = Math.floor(totalSec / 60)
+	const s = totalSec % 60
+	if (m > 0 || totalSec >= 60) {
+		return `${m}:${String(s).padStart(2, "0")}`
+	}
+	return `${s}s`
+}
+
+function rulerTickStep(durationSeconds: number) {
+	if (durationSeconds <= 60) return 1
+	if (durationSeconds <= 5 * 60) return 5
+	if (durationSeconds <= 15 * 60) return 10
+	if (durationSeconds <= 60 * 60) return 30
+	return 60
+}
+
+function trackClipColor(
+	track: EditTrack,
+	index: number,
+	isDragging: boolean,
+	isSelected: boolean
+) {
 	const base =
 		track.type === "audio"
 			? index % 2 === 0
@@ -55,17 +101,19 @@ function trackClipColor(track: EditTrack, index: number, isDragging: boolean) {
 
 	return isDragging
 		? `${base} ring-2 ring-white shadow-lg opacity-95`
-		: `${base} shadow-sm`
+		: isSelected
+			? `${base} ring-2 ring-white/90 shadow-md`
+			: `${base} shadow-sm`
 }
 
 function timeFromPointer(
 	clientX: number,
 	scrollLeft: number,
-	rectLeft: number,
+	viewportLeft: number,
 	pxPerSec: number
 ) {
-	const x = clientX - rectLeft + scrollLeft
-	return Math.max(0, x / pxPerSec)
+	const x = clientX - viewportLeft + scrollLeft
+	return roundTimelineSeconds(Math.max(0, x / pxPerSec))
 }
 
 function resolveClipPlacement(
@@ -119,11 +167,25 @@ export function EditorTimeline({
 	const contentRef = useRef<HTMLDivElement>(null)
 	const [clipDrag, setClipDrag] = useState<ClipDragState | null>(null)
 	const clipDragRef = useRef<ClipDragState | null>(null)
+	const [pendingClipPointer, setPendingClipPointer] =
+		useState<PendingClipPointer | null>(null)
+	const pendingClipPointerRef = useRef<PendingClipPointer | null>(null)
+	const [selectedClipId, setSelectedClipId] = useState<string | null>(null)
 	const [dropTargetTrackId, setDropTargetTrackId] = useState<string | null>(
 		null
 	)
 
 	clipDragRef.current = clipDrag
+	pendingClipPointerRef.current = pendingClipPointer
+
+	useEffect(() => {
+		if (
+			selectedClipId &&
+			!edit.clips.some((clip) => clip.id === selectedClipId)
+		) {
+			setSelectedClipId(null)
+		}
+	}, [edit.clips, selectedClipId])
 
 	const timelineSeconds = Math.max(
 		edit.duration,
@@ -131,7 +193,7 @@ export function EditorTimeline({
 		playheadSeconds + 2
 	)
 	const timelineWidth = timelineSeconds * pxPerSec
-	const playheadLeft = playheadSeconds * pxPerSec
+	const playheadLeft = Math.round(playheadSeconds * pxPerSec)
 
 	const clipsByTrack = useMemo(() => {
 		const map = new Map<string, TimelineClip[]>()
@@ -153,7 +215,7 @@ export function EditorTimeline({
 
 	const rulerTicks = useMemo(() => {
 		const ticks: number[] = []
-		const step = timelineSeconds > 60 ? 5 : 1
+		const step = rulerTickStep(timelineSeconds)
 		for (let t = 0; t <= timelineSeconds; t += step) {
 			ticks.push(t)
 		}
@@ -179,10 +241,9 @@ export function EditorTimeline({
 	const timeAtClientX = useCallback(
 		(clientX: number) => {
 			const scrollEl = horizontalScrollRef.current
-			const contentEl = contentRef.current
-			if (!scrollEl || !contentEl) return 0
+			if (!scrollEl) return 0
 
-			const rect = contentEl.getBoundingClientRect()
+			const rect = scrollEl.getBoundingClientRect()
 			return timeFromPointer(
 				clientX,
 				scrollEl.scrollLeft,
@@ -198,10 +259,22 @@ export function EditorTimeline({
 
 	const seekFromEvent = useCallback(
 		(clientX: number) => {
-			const time = timeAtClientX(clientX)
+			const time = snapToFrame(timeAtClientX(clientX), edit.fps)
 			onPlayheadChange(Math.min(time, timelineSeconds))
 		},
-		[onPlayheadChange, timeAtClientX, timelineSeconds]
+		[edit.fps, onPlayheadChange, timeAtClientX, timelineSeconds]
+	)
+
+	const clearClipSelection = useCallback(() => {
+		setSelectedClipId(null)
+	}, [])
+
+	const handleTimelineSeek = useCallback(
+		(clientX: number) => {
+			clearClipSelection()
+			seekFromEvent(clientX)
+		},
+		[clearClipSelection, seekFromEvent]
 	)
 
 	const handleAddTrack = useCallback(
@@ -211,7 +284,7 @@ export function EditorTimeline({
 		[edit, onEditChange]
 	)
 
-	const beginClipDrag = useCallback(
+	const beginClipPointerDown = useCallback(
 		(
 			event: React.PointerEvent,
 			clip: TimelineClip,
@@ -223,9 +296,11 @@ export function EditorTimeline({
 			const pointerTime = timeAtClientX(event.clientX)
 			const grabOffsetSec = pointerTime - placement.startOnTimeline
 
-			setClipDrag({
+			setPendingClipPointer({
 				clipId: clip.id,
 				pointerId: event.pointerId,
+				startClientX: event.clientX,
+				startClientY: event.clientY,
 				grabOffsetSec,
 				originTrackId: placement.trackId,
 				previewStart: placement.startOnTimeline,
@@ -237,10 +312,59 @@ export function EditorTimeline({
 		[timeAtClientX]
 	)
 
+	const promotePendingToDrag = useCallback((pending: PendingClipPointer) => {
+		setClipDrag({
+			clipId: pending.clipId,
+			pointerId: pending.pointerId,
+			grabOffsetSec: pending.grabOffsetSec,
+			originTrackId: pending.originTrackId,
+			previewStart: pending.previewStart,
+			previewTrackId: pending.previewTrackId,
+		})
+		setPendingClipPointer(null)
+	}, [])
+
 	useEffect(() => {
-		if (!clipDrag) return
+		if (!selectedClipId) return
+
+		function onKeyDown(event: KeyboardEvent) {
+			if (event.key !== "Delete" && event.key !== "Backspace") return
+
+			const target = event.target
+			if (
+				target instanceof HTMLElement &&
+				(target.tagName === "INPUT" ||
+					target.tagName === "TEXTAREA" ||
+					target.isContentEditable)
+			) {
+				return
+			}
+
+			event.preventDefault()
+			onEditChange(removeTimelineClip(edit, selectedClipId))
+			setSelectedClipId(null)
+		}
+
+		document.addEventListener("keydown", onKeyDown)
+		return () => document.removeEventListener("keydown", onKeyDown)
+	}, [edit, onEditChange, selectedClipId])
+
+	useEffect(() => {
+		if (!clipDrag && !pendingClipPointer) return
 
 		function onPointerMove(event: PointerEvent) {
+			const pending = pendingClipPointerRef.current
+			if (pending && event.pointerId === pending.pointerId) {
+				const dx = event.clientX - pending.startClientX
+				const dy = event.clientY - pending.startClientY
+				if (
+					Math.hypot(dx, dy) >= CLIP_DRAG_THRESHOLD_PX
+				) {
+					promotePendingToDrag(pending)
+				}
+				return
+			}
+
 			const drag = clipDragRef.current
 			if (!drag || event.pointerId !== drag.pointerId) return
 
@@ -260,7 +384,14 @@ export function EditorTimeline({
 			setDropTargetTrackId(trackId)
 		}
 
-		function finishDrag(event: PointerEvent) {
+		function finishInteraction(event: PointerEvent) {
+			const pending = pendingClipPointerRef.current
+			if (pending && event.pointerId === pending.pointerId) {
+				setSelectedClipId(pending.clipId)
+				setPendingClipPointer(null)
+				return
+			}
+
 			const drag = clipDragRef.current
 			if (!drag || event.pointerId !== drag.pointerId) return
 
@@ -271,6 +402,7 @@ export function EditorTimeline({
 					trackId: drag.previewTrackId,
 				})
 				onEditChange(moved)
+				setSelectedClipId(drag.clipId)
 			}
 
 			setClipDrag(null)
@@ -278,15 +410,23 @@ export function EditorTimeline({
 		}
 
 		document.addEventListener("pointermove", onPointerMove)
-		document.addEventListener("pointerup", finishDrag)
-		document.addEventListener("pointercancel", finishDrag)
+		document.addEventListener("pointerup", finishInteraction)
+		document.addEventListener("pointercancel", finishInteraction)
 
 		return () => {
 			document.removeEventListener("pointermove", onPointerMove)
-			document.removeEventListener("pointerup", finishDrag)
-			document.removeEventListener("pointercancel", finishDrag)
+			document.removeEventListener("pointerup", finishInteraction)
+			document.removeEventListener("pointercancel", finishInteraction)
 		}
-	}, [clipDrag, edit, getTrackIdAtClientY, onEditChange, timeAtClientX])
+	}, [
+		clipDrag,
+		edit,
+		getTrackIdAtClientY,
+		onEditChange,
+		pendingClipPointer,
+		promotePendingToDrag,
+		timeAtClientX,
+	])
 
 	const handleAssetDragOver = useCallback(
 		(event: React.DragEvent, trackId: string) => {
@@ -377,7 +517,7 @@ export function EditorTimeline({
 						</label>
 					)}
 					<p className="text-xs tabular-nums text-zinc-400 min-w-10 text-right">
-						{formatRulerLabel(Math.round(playheadSeconds * 10) / 10)}
+						{formatPlayheadTime(playheadSeconds, edit.fps)}
 					</p>
 				</div>
 			</div>
@@ -445,15 +585,21 @@ export function EditorTimeline({
 									className="sticky top-0 z-30 cursor-crosshair border-b border-zinc-700/80 bg-zinc-950/95 backdrop-blur-sm"
 									style={{ height: RULER_HEIGHT }}
 									onPointerDown={(event) => {
-										if (clipDrag) return
-										seekFromEvent(event.clientX)
+										if (clipDrag || pendingClipPointer) return
+										handleTimelineSeek(event.clientX)
 										event.currentTarget.setPointerCapture(
 											event.pointerId
 										)
 									}}
 									onPointerMove={(event) => {
-										if (clipDrag || event.buttons !== 1) return
-										seekFromEvent(event.clientX)
+										if (
+											clipDrag ||
+											pendingClipPointer ||
+											event.buttons !== 1
+										) {
+											return
+										}
+										handleTimelineSeek(event.clientX)
 									}}
 								>
 									{rulerTicks.map((tick) => (
@@ -504,15 +650,21 @@ export function EditorTimeline({
 												handleAssetDrop(event, track.id)
 											}
 											onPointerDown={(event) => {
-												if (clipDrag) return
-												seekFromEvent(event.clientX)
+												if (clipDrag || pendingClipPointer) return
+												handleTimelineSeek(event.clientX)
 												event.currentTarget.setPointerCapture(
 													event.pointerId
 												)
 											}}
 											onPointerMove={(event) => {
-												if (clipDrag || event.buttons !== 1) return
-												seekFromEvent(event.clientX)
+												if (
+													clipDrag ||
+													pendingClipPointer ||
+													event.buttons !== 1
+												) {
+													return
+												}
+												handleTimelineSeek(event.clientX)
 											}}
 										>
 											{trackClips.map((clip, index) => {
@@ -522,6 +674,8 @@ export function EditorTimeline({
 												)
 												const isDragging =
 													clipDrag?.clipId === clip.id
+												const isSelected =
+													selectedClipId === clip.id
 												const width =
 													clipTimelineDuration(clip) * pxPerSec
 												const left =
@@ -533,13 +687,13 @@ export function EditorTimeline({
 														role="button"
 														tabIndex={0}
 														onPointerDown={(event) =>
-															beginClipDrag(
+															beginClipPointerDown(
 																event,
 																clip,
 																placement
 															)
 														}
-														className={`absolute top-1 bottom-1 flex min-w-[2px] cursor-grab items-center overflow-hidden rounded border px-1 text-[10px] font-medium text-white active:cursor-grabbing ${trackClipColor(track, index, isDragging)}`}
+														className={`absolute top-1 bottom-1 flex min-w-[2px] cursor-grab items-center overflow-hidden rounded border px-1 text-[10px] font-medium text-white active:cursor-grabbing ${trackClipColor(track, index, isDragging, isSelected)}`}
 														style={{
 															left,
 															width: Math.max(width, 4),
@@ -547,7 +701,7 @@ export function EditorTimeline({
 																? 60
 																: 10 + index,
 														}}
-														title={`${basename(clip.clipFile)} · drag to move`}
+														title={`${basename(clip.clipFile)} · drag to move · Delete to remove`}
 													>
 														<span className="pointer-events-none truncate">
 															{basename(clip.clipFile)}
