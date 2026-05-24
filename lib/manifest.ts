@@ -10,6 +10,7 @@ export type Manifest = {
 	slug?: string
 	sourceFiles: string[]
 	settings?: Partial<VideoSettings>
+	processedFiles?: string[]
 }
 
 export function manifestPath(projectId: string) {

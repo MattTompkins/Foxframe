@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { useParams } from "next/navigation"
-import  FileBrowser  from "@/components/FileBrowser"
+import FileBrowser from "@/components/FileBrowser"
+import { isVideoFileName, VIDEO_EXTENSIONS_LABEL } from "@/lib/video-files"
 
 type Props = {
 	params: {
@@ -28,6 +29,14 @@ export default function ProjectFilesPage({ params }: Props) {
 	}
 
 	const uploadSingleFile = async (file: File, index: number, totalFiles: number) => {
+		if (!isVideoFileName(file.name)) {
+			setError(
+				`"${file.name}" is not a supported video file. Allowed formats: ${VIDEO_EXTENSIONS_LABEL}`
+			)
+			setUploadStatus(((index + 1) / totalFiles) * 100)
+			return
+		}
+
 		const formData = new FormData();
 		formData.append("file", file)
 		formData.append("index", index.toString())
@@ -41,7 +50,10 @@ export default function ProjectFilesPage({ params }: Props) {
 			})
 
 			if (!response.ok) {
-				throw new Error(`Failed to upload file: ${file.name}`)
+				const data = await response.json().catch(() => ({}))
+				throw new Error(
+					data.error ?? `Failed to upload file: ${file.name}`
+				)
 			}
 
 			const data = await response.json()
@@ -126,7 +138,7 @@ export default function ProjectFilesPage({ params }: Props) {
 						</div>
 
 						<div className="mt-2 text-sm text-gray-400">
-							Click to browse or drag and drop
+							.mov, .mp4, .m4v, .webm and other video formats
 						</div>
 					</label>
 
@@ -134,6 +146,7 @@ export default function ProjectFilesPage({ params }: Props) {
 						type="file"
 						id="file-upload"
 						multiple
+						accept="video/*,.mov,.mp4,.m4v,.webm,.avi,.mkv,.mpeg,.mpg,.3gp"
 						className="hidden"
 						onChange={(e) => {
 							if (e.target.files) {

@@ -1,11 +1,13 @@
 export type AspectRatio = "9:16" | "1:1" | "16:9"
 export type CropMode = "center" | "top" | "bottom"
+export type FramingMode = "smart" | "fit" | "fill"
 export type OutputResolution = "1080x1920" | "720x1280" | "1080x1080" | "1920x1080"
 export type OutputFormat = "mp4" | "mov"
 export type OutputCodec = "h264" | "h265"
 
 export type VideoSettings = {
 	aspectRatio: AspectRatio
+	framingMode: FramingMode
 	cropMode: CropMode
 	lensK1: number
 	lensK2: number
@@ -18,6 +20,7 @@ export type VideoSettings = {
 
 export const DEFAULT_VIDEO_SETTINGS: VideoSettings = {
 	aspectRatio: "9:16",
+	framingMode: "smart",
 	cropMode: "center",
 	lensK1: 0,
 	lensK2: 0,
@@ -30,6 +33,7 @@ export const DEFAULT_VIDEO_SETTINGS: VideoSettings = {
 
 const ASPECT_RATIOS = new Set<AspectRatio>(["9:16", "1:1", "16:9"])
 const CROP_MODES = new Set<CropMode>(["center", "top", "bottom"])
+const FRAMING_MODES = new Set<FramingMode>(["smart", "fit", "fill"])
 const OUTPUT_RESOLUTIONS = new Set<OutputResolution>([
 	"1080x1920",
 	"720x1280",
@@ -53,6 +57,9 @@ export function mergeVideoSettings(
 		cropMode: CROP_MODES.has(partial.cropMode as CropMode)
 			? (partial.cropMode as CropMode)
 			: DEFAULT_VIDEO_SETTINGS.cropMode,
+		framingMode: FRAMING_MODES.has(partial.framingMode as FramingMode)
+			? (partial.framingMode as FramingMode)
+			: DEFAULT_VIDEO_SETTINGS.framingMode,
 		lensK1:
 			typeof partial.lensK1 === "number" && Number.isFinite(partial.lensK1)
 				? partial.lensK1

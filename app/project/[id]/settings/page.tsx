@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 import {
 	DEFAULT_VIDEO_SETTINGS,
 	type AspectRatio,
+	type FramingMode,
 	type OutputCodec,
 	type OutputFormat,
 	type OutputResolution,
@@ -69,8 +70,8 @@ function AspectRatioPreview({ ratio }: { ratio: AspectRatio }) {
 				aria-hidden
 			/>
 			<p className="text-sm text-zinc-400">
-				Preview of the <strong className="text-zinc-300">frame shape</strong>{" "}
-				your video will be cropped to. Anything outside this box is cut off.
+				Preview of the <strong className="text-zinc-300">output frame shape</strong>.
+				Smart and Fit modes keep your full video inside this box; Fill mode crops to it.
 			</p>
 		</div>
 	)
@@ -201,11 +202,63 @@ export default function ProjectSettingsPage() {
 				>
 					<SettingSection
 						title="Framing & crop"
-						summary="Choose the shape of your final video and which part of the original frame to keep when the source is wider or taller than your target."
+						summary="Control how your video is resized to the target shape — keep the full frame, crop aggressively, or let smart mode decide based on your content."
 					>
 						<SettingField
+							label="Framing strategy"
+							help="This is the biggest factor in how much of your video survives processing. Smart mode analyses your footage and picks the least destructive approach. Fit never cuts anything off (adds black bars instead). Fill always crops to fill the frame edge-to-edge."
+							example="Use Smart for mixed phone clips. Use Fit if heads or text keep getting cut off. Use Fill only when you want a tight, full-bleed crop."
+						>
+							<fieldset className="flex flex-col gap-2">
+								{(
+									[
+										{
+											value: "smart" as const,
+											title: "Smart (recommended)",
+											desc: "Detects the main content area, frames around it, and switches to letterboxing if a hard crop would cut off too much.",
+										},
+										{
+											value: "fit" as const,
+											title: "Fit — show everything",
+											desc: "Scales the full video to fit inside the target shape. Nothing is cut off; black bars fill the empty space.",
+										},
+										{
+											value: "fill" as const,
+											title: "Fill — crop to fit",
+											desc: "Crops edges until the frame is completely filled. Best for footage that already matches your target shape.",
+										},
+									] as const
+								).map((opt) => (
+									<label
+										key={opt.value}
+										className={`flex cursor-pointer flex-col rounded-lg border px-4 py-3 transition-colors ${
+											settings.framingMode === opt.value
+												? "border-blue-500 bg-blue-500/10"
+												: "border-zinc-600 bg-zinc-900 hover:border-zinc-500"
+										}`}
+									>
+										<span className="flex items-center gap-2">
+											<input
+												type="radio"
+												name="framingMode"
+												value={opt.value}
+												checked={settings.framingMode === opt.value}
+												onChange={() => update("framingMode", opt.value)}
+												className="accent-blue-500"
+											/>
+											<span className="font-medium text-white">{opt.title}</span>
+										</span>
+										<span className="mt-1 pl-6 text-sm text-zinc-400">
+											{opt.desc}
+										</span>
+									</label>
+								))}
+							</fieldset>
+						</SettingField>
+
+						<SettingField
 							label="Target aspect ratio"
-							help="The width-to-height proportion of the finished video. We crop the source to match this shape — nothing is stretched or squashed."
+							help="The width-to-height proportion of the finished video. With Fit or Smart mode, your full video is preserved inside this shape. With Fill mode, we crop to match it exactly."
 							example="Pick 9:16 for TikTok, Instagram Reels, and YouTube Shorts."
 						>
 							<select
@@ -227,57 +280,59 @@ export default function ProjectSettingsPage() {
 							<AspectRatioPreview ratio={settings.aspectRatio} />
 						</SettingField>
 
-						<SettingField
-							label="Crop position"
-							help="When the source video is larger than the target frame, we have to cut off the edges. This tells us which area to keep: the middle, the top (good for talking-head shots), or the bottom."
-							example="Use “Keep the top” if someone’s face is near the top of a tall phone recording."
-						>
-							<fieldset className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-								{(
-									[
-										{
-											value: "center" as const,
-											title: "Center",
-											desc: "Balanced crop — best default for most clips.",
-										},
-										{
-											value: "top" as const,
-											title: "Keep the top",
-											desc: "Preserves the upper portion; trims from the bottom.",
-										},
-										{
-											value: "bottom" as const,
-											title: "Keep the bottom",
-											desc: "Preserves the lower portion; trims from the top.",
-										},
-									] as const
-								).map((opt) => (
-									<label
-										key={opt.value}
-										className={`flex flex-1 cursor-pointer flex-col rounded-lg border px-4 py-3 transition-colors ${
-											settings.cropMode === opt.value
-												? "border-blue-500 bg-blue-500/10"
-												: "border-zinc-600 bg-zinc-900 hover:border-zinc-500"
-										}`}
-									>
-										<span className="flex items-center gap-2">
-											<input
-												type="radio"
-												name="cropMode"
-												value={opt.value}
-												checked={settings.cropMode === opt.value}
-												onChange={() => update("cropMode", opt.value)}
-												className="accent-blue-500"
-											/>
-											<span className="font-medium text-white">{opt.title}</span>
-										</span>
-										<span className="mt-1 pl-6 text-sm text-zinc-400">
-											{opt.desc}
-										</span>
-									</label>
-								))}
-							</fieldset>
-						</SettingField>
+						{settings.framingMode !== "fit" && (
+							<SettingField
+								label="Crop focus"
+								help="When cropping is needed, this tells us where to anchor the frame — based on the detected content area in Smart mode, or the raw video otherwise. Not used when Framing strategy is Fit."
+								example="Use “Keep the top” for talking-head clips where the face is in the upper half."
+							>
+								<fieldset className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+									{(
+										[
+											{
+												value: "center" as const,
+												title: "Center on content",
+												desc: "Frames the middle of the detected subject area.",
+											},
+											{
+												value: "top" as const,
+												title: "Keep the top",
+												desc: "Biases the crop upward — good for faces and heads.",
+											},
+											{
+												value: "bottom" as const,
+												title: "Keep the bottom",
+												desc: "Biases the crop downward — good for action in the lower frame.",
+											},
+										] as const
+									).map((opt) => (
+										<label
+											key={opt.value}
+											className={`flex flex-1 cursor-pointer flex-col rounded-lg border px-4 py-3 transition-colors ${
+												settings.cropMode === opt.value
+													? "border-blue-500 bg-blue-500/10"
+													: "border-zinc-600 bg-zinc-900 hover:border-zinc-500"
+											}`}
+										>
+											<span className="flex items-center gap-2">
+												<input
+													type="radio"
+													name="cropMode"
+													value={opt.value}
+													checked={settings.cropMode === opt.value}
+													onChange={() => update("cropMode", opt.value)}
+													className="accent-blue-500"
+												/>
+												<span className="font-medium text-white">{opt.title}</span>
+											</span>
+											<span className="mt-1 pl-6 text-sm text-zinc-400">
+												{opt.desc}
+											</span>
+										</label>
+									))}
+								</fieldset>
+							</SettingField>
+						)}
 
 						<SettingField
 							label="Output resolution"

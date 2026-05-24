@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import path from "path"
 import fs from "fs/promises"
+import { isVideoFileName, VIDEO_EXTENSIONS_LABEL } from "@/lib/video-files"
 
 const PROJECTS_DIR = path.join(process.cwd(), "storage/projects")
 
@@ -29,6 +30,15 @@ export async function POST(
 		if (!file) {
 			return NextResponse.json(
 				{ error: "No file provided" },
+				{ status: 400 }
+			)
+		}
+
+		if (!isVideoFileName(file.name)) {
+			return NextResponse.json(
+				{
+					error: `"${file.name}" is not a supported video file. Allowed formats: ${VIDEO_EXTENSIONS_LABEL}`,
+				},
 				{ status: 400 }
 			)
 		}
