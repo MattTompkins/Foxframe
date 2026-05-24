@@ -8,7 +8,9 @@ import { EditorHeader } from "@/components/EditorHeader"
 import { EditorPanel } from "@/components/EditorPanel"
 import { EditorResizablePanel } from "@/components/EditorResizablePanel"
 import { EditorTimeline } from "@/components/EditorTimeline"
+import { SequencePreview } from "@/components/SequencePreview"
 import { VideoPlayer } from "@/components/VideoPlayer"
+import { useSequencePlayback } from "@/hooks/useSequencePlayback"
 import type { ClipSegment } from "@/lib/clip-segments"
 import {
 	addClipToEdit,
@@ -90,8 +92,11 @@ export default function EditorPage() {
 	const [projectName, setProjectName] = useState("Loading…")
 	const [clips, setClips] = useState<string[]>([])
 	const [clipSegments, setClipSegments] = useState<ClipSegment[]>([])
-	const [selectedClipFile, setSelectedClipFile] = useState<string | null>(null)
+	const [sourcePreviewClip, setSourcePreviewClip] = useState<string | null>(
+		null
+	)
 	const [currentEdit, setCurrentEdit] = useState<ProjectEdit | null>(null)
+	const [isPlaying, setIsPlaying] = useState(false)
 	const [editLoading, setEditLoading] = useState(true)
 	const [editSaving, setEditSaving] = useState(false)
 	const [editPersistError, setEditPersistError] = useState<string | null>(null)
@@ -167,7 +172,7 @@ export default function EditorPage() {
 				setProjectName(data.project.name)
 				setClips(data.clips)
 				setClipSegments(data.clipSegments)
-				setSelectedClipFile(data.clips[0] ?? null)
+				setSourcePreviewClip(null)
 			} catch (loadError) {
 				if (!cancelled) {
 					setError(
@@ -178,7 +183,7 @@ export default function EditorPage() {
 					setProjectName("Project")
 					setClips([])
 					setClipSegments([])
-					setSelectedClipFile(null)
+					setSourcePreviewClip(null)
 				}
 			} finally {
 				if (!cancelled) {
@@ -271,9 +276,34 @@ export default function EditorPage() {
 		(edit: ProjectEdit) => {
 			applyEdit(edit, { dirty: false })
 			setPlayheadSeconds(0)
+			setIsPlaying(false)
 		},
 		[applyEdit]
 	)
+
+	const handlePlayToggle = useCallback(() => {
+		if (!currentEdit || currentEdit.clips.length === 0) return
+
+		setIsPlaying((playing) => {
+			if (playing) return false
+
+			if (playheadSeconds >= currentEdit.duration - 0.05) {
+				setPlayheadSeconds(0)
+			}
+			return true
+		})
+	}, [currentEdit, playheadSeconds])
+
+	useSequencePlayback({
+		isPlaying,
+		duration: currentEdit?.duration ?? 0,
+		onTick: (updater) => {
+			setPlayheadSeconds(updater)
+		},
+		onReachEnd: () => {
+			setIsPlaying(false)
+		},
+	})
 
 	return (
 		<div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-zinc-950 font-sans text-zinc-100">
@@ -313,8 +343,11 @@ export default function EditorPage() {
 							clipSegments={clipSegments}
 							loading={loading}
 							error={null}
-							selectedClipFile={selectedClipFile}
-							onSelectClip={setSelectedClipFile}
+						selectedClipFile={sourcePreviewClip}
+						onSelectClip={(clipFile) => {
+							setIsPlaying(false)
+							setSourcePreviewClip(clipFile)
+						}}
 							canDragToTimeline={Boolean(currentEdit && !editLoading)}
 						/>
 					</EditorResizablePanel>
@@ -334,8 +367,11 @@ export default function EditorPage() {
 							clipSegments={clipSegments}
 							loading={loading}
 							error={null}
-							selectedClipFile={selectedClipFile}
-							onSelectClip={setSelectedClipFile}
+						selectedClipFile={sourcePreviewClip}
+						onSelectClip={(clipFile) => {
+							setIsPlaying(false)
+							setSourcePreviewClip(clipFile)
+						}}
 							canDragToTimeline={Boolean(currentEdit && !editLoading)}
 						/>
 					</EditorResizablePanel>
@@ -347,28 +383,36 @@ export default function EditorPage() {
 					scrollable={false}
 					padded={false}
 				>
-					{selectedClipFile ? (
+					{sourcePreviewClip ? (
 						<div className="relative h-full w-full">
 							<button
-								className="absolute top-4 text-xs right-5 z-20 text-orange-600 bg-zinc-800/50 px-2 py-1 rounded cursor-pointer hover:bg-zinc-800/80 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
-								onClick={() => setSelectedClipFile(null)}
+								type="button"
+								className="absolute top-4 right-5 z-20 rounded bg-zinc-800/50 px-2 py-1 text-xs text-orange-600 hover:bg-zinc-800/80 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
+								onClick={() => setSourcePreviewClip(null)}
 							>
-								Exit media preview
+								Back to sequence
 							</button>
 							<VideoPlayer
-								key={selectedClipFile}
+								key={sourcePreviewClip}
 								fill
-								source={clipMediaUrl(projectId, selectedClipFile)}
-								clipFileName={selectedClipFile}
+								source={clipMediaUrl(projectId, sourcePreviewClip)}
+								clipFileName={sourcePreviewClip}
 								autoPlay
 								muted
 								loop
 							/>
 						</div>
+					) : currentEdit && !editLoading ? (
+						<SequencePreview
+							projectId={projectId}
+							edit={currentEdit}
+							playheadSeconds={playheadSeconds}
+							isPlaying={isPlaying}
+						/>
 					) : (
-						<div className="flex h-full min-h-0 flex-1 items-center justify-center">
+						<div className="flex h-full min-h-0 flex-1 items-center justify-center bg-black">
 							<p className="text-center text-sm text-zinc-500">
-								Select a clip to preview
+								Load an edit to preview the sequence
 							</p>
 						</div>
 					)}
@@ -394,7 +438,12 @@ export default function EditorPage() {
 					<EditorTimeline
 						edit={currentEdit}
 						playheadSeconds={playheadSeconds}
-						onPlayheadChange={setPlayheadSeconds}
+						onPlayheadChange={(seconds) => {
+							setIsPlaying(false)
+							setPlayheadSeconds(seconds)
+						}}
+						isPlaying={isPlaying}
+						onPlayToggle={handlePlayToggle}
 						onEditChange={(next) => updateEdit(() => next)}
 						onAddClipFromAsset={(clipFile, trackId, startOnTimeline) => {
 							const duration = clipDurationFromSegments(

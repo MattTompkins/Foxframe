@@ -145,3 +145,57 @@ export function topClipAtTime(
 	)
 	return onTrack.length > 0 ? onTrack[onTrack.length - 1] : null
 }
+
+export type SequencePlaybackFrame = {
+	clip: TimelineClip
+	/** Time to seek within the clip file (seconds). */
+	mediaTimeInFile: number
+	timelineTime: number
+}
+
+function frameFromClipAtTime(clip: TimelineClip, timelineTime: number) {
+	const offsetOnClip = timelineTime - clip.startOnTimeline
+	const mediaTimeInFile = roundTimelineSeconds(
+		Math.min(
+			clip.sourceOut - 0.001,
+			Math.max(clip.sourceIn, clip.sourceIn + offsetOnClip)
+		)
+	)
+
+	return {
+		clip,
+		mediaTimeInFile,
+		timelineTime: roundTimelineSeconds(timelineTime),
+	}
+}
+
+/**
+ * Resolve program output at a point on the sequence timeline.
+ * Walks video tracks in edit order (Video 1, then Video 2, …) and uses the
+ * first track that has a clip at `timelineTime`.
+ */
+export function resolvePlaybackAtTime(
+	edit: ProjectEdit,
+	timelineTime: number
+): SequencePlaybackFrame | null {
+	for (const track of edit.tracks) {
+		if (track.type !== "video") continue
+
+		const clip = topClipAtTime(edit, track.id, timelineTime)
+		if (clip) {
+			return frameFromClipAtTime(clip, timelineTime)
+		}
+	}
+
+	return null
+}
+
+/** Map the program video element's clock to sequence time. */
+export function timelineTimeFromVideo(
+	clip: TimelineClip,
+	videoCurrentTime: number
+) {
+	return roundTimelineSeconds(
+		clip.startOnTimeline + (videoCurrentTime - clip.sourceIn)
+	)
+}

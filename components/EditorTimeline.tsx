@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Film, Mic } from "lucide-react"
+import { Film, Mic, Pause, Play } from "lucide-react"
 import {
 	CLIP_DRAG_MIME,
 	addTrackToEdit,
@@ -90,6 +90,8 @@ export function EditorTimeline({
 	onPlayheadChange,
 	onEditChange,
 	onAddClipFromAsset,
+	isPlaying = false,
+	onPlayToggle,
 	pxPerSec = DEFAULT_PX_PER_SEC,
 	saving = false,
 }: {
@@ -102,6 +104,8 @@ export function EditorTimeline({
 		trackId: string,
 		startOnTimeline: number
 	) => void
+	isPlaying?: boolean
+	onPlayToggle?: () => void
 	pxPerSec?: number
 	saving?: boolean
 }) {
@@ -312,6 +316,22 @@ export function EditorTimeline({
 					{saving ? " · Saving…" : ""}
 				</p>
 				<div className="flex flex-wrap items-center gap-2">
+					{onPlayToggle && (
+						<button
+							type="button"
+							onClick={onPlayToggle}
+							disabled={edit.clips.length === 0}
+							className="inline-flex items-center gap-1 rounded-md border border-zinc-600 bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-200 hover:border-orange-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+							aria-label={isPlaying ? "Pause" : "Play"}
+						>
+							{isPlaying ? (
+								<Pause className="h-3.5 w-3.5" />
+							) : (
+								<Play className="h-3.5 w-3.5" />
+							)}
+							{isPlaying ? "Pause" : "Play"}
+						</button>
+					)}
 					<button
 						type="button"
 						onClick={() => handleAddTrack("video")}
@@ -328,7 +348,7 @@ export function EditorTimeline({
 						<Mic className="h-3.5 w-3.5" />
 						Add audio track
 					</button>
-					<p className="text-xs tabular-nums text-zinc-400">
+					<p className="text-xs tabular-nums text-zinc-400 min-w-10 text-right">
 						{formatRulerLabel(Math.round(playheadSeconds * 10) / 10)}
 					</p>
 				</div>
