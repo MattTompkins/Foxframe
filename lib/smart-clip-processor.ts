@@ -6,13 +6,13 @@ import {
 	buildClipScoreFields,
 	indexManualFinalScores,
 	listSelectedClipFiles,
+	enrichClipSegments,
 	markSelectedClips,
 	roundScore,
 } from "@/lib/clip-scores"
 import { cutClip } from "@/lib/clip-cutter"
 import {
 	describeCvScore,
-	describeSegmentOutcome,
 	describeSignalScore,
 	type ClipSegment,
 } from "@/lib/clip-segments"
@@ -224,22 +224,11 @@ export async function processSmartClips(
 	}
 
 	for (const processedFile of processedFiles) {
-		let ranked = assignRanksByFinalScore(segments, processedFile).filter(
-			(s) => s.sourceFile === processedFile
-		)
-		ranked = markSelectedClips(ranked, smartEditing.clipsPerSourceFile)
-
-		for (const segment of ranked) {
-			segment.selectedBecause = describeSegmentOutcome(
-				segment,
-				smartEditing.clipsPerSourceFile
-			)
-		}
-
-		segments = segments
-			.filter((s) => s.sourceFile !== processedFile)
-			.concat(ranked)
+		segments = assignRanksByFinalScore(segments, processedFile)
 	}
+
+	segments = markSelectedClips(segments, smartEditing.clipsPerSourceFile)
+	segments = enrichClipSegments(segments, smartEditing.clipsPerSourceFile)
 
 	const selectedClips = listSelectedClipFiles(segments)
 

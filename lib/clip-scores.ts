@@ -1,4 +1,8 @@
-import type { ClipSegment, ClipScoreSource } from "@/lib/clip-segments"
+import {
+	describeSegmentOutcome,
+	type ClipSegment,
+	type ClipScoreSource,
+} from "@/lib/clip-segments"
 import type { CvScoreDetail } from "@/lib/cv-scorer"
 import type { FinalScoreSource, SmartEditingSettings } from "@/lib/smart-editing-settings"
 
@@ -122,6 +126,25 @@ export function indexManualFinalScores(segments: ClipSegment[] | undefined) {
 	return map
 }
 
+/** Rank every clip by finalScore across the whole project. */
+export function assignGlobalRanks(segments: ClipSegment[]): ClipSegment[] {
+	const total = segments.length
+	if (total === 0) {
+		return segments
+	}
+
+	const sorted = [...segments].sort((a, b) => b.finalScore - a.finalScore)
+	const rankByClipFile = new Map(
+		sorted.map((segment, index) => [segment.clipFile, index + 1])
+	)
+
+	return segments.map((segment) => ({
+		...segment,
+		globalRank: rankByClipFile.get(segment.clipFile) ?? 0,
+		globalClipCount: total,
+	}))
+}
+
 export function assignRanksByFinalScore(
 	segments: ClipSegment[],
 	sourceFile: string
@@ -164,4 +187,16 @@ export function markSelectedClips(
 
 export function listSelectedClipFiles(segments: ClipSegment[]) {
 	return segments.filter((s) => s.selectedForUse).map((s) => s.clipFile)
+}
+
+/** Recompute global ranks and human-readable outcome text (e.g. when loading manifest). */
+export function enrichClipSegments(
+	segments: ClipSegment[],
+	clipsPerSourceFile: number
+): ClipSegment[] {
+	const ranked = assignGlobalRanks(segments)
+	return ranked.map((segment) => ({
+		...segment,
+		selectedBecause: describeSegmentOutcome(segment, clipsPerSourceFile),
+	}))
 }

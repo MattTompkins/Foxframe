@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { StepCounter } from "@/components/StepCounter"
+import { SettingField } from "@/components/SettingField"
+import { SettingSection } from "@/components/SettingSection"
 import {
 	DEFAULT_VIDEO_SETTINGS,
 	type AspectRatio,
@@ -13,50 +15,6 @@ import {
 	type OutputResolution,
 	type VideoSettings,
 } from "@/lib/video-settings"
-
-function SettingSection({
-	title,
-	summary,
-	children,
-}: {
-	title: string
-	summary: string
-	children: React.ReactNode
-}) {
-	return (
-		<section className="w-full rounded-xl border border-zinc-700 bg-zinc-800/50 p-6">
-			<h2 className="text-xl font-semibold text-white">{title}</h2>
-			<p className="mt-1 text-sm leading-relaxed text-zinc-400">{summary}</p>
-			<div className="mt-5 flex flex-col gap-6">{children}</div>
-		</section>
-	)
-}
-
-function SettingField({
-	label,
-	help,
-	example,
-	children,
-}: {
-	label: string
-	help: string
-	example?: string
-	children: React.ReactNode
-}) {
-	return (
-		<div className="flex flex-col gap-2">
-			<label className="text-base font-medium text-white">{label}</label>
-			<p className="text-sm leading-relaxed text-zinc-400">{help}</p>
-			{example && (
-				<p className="text-xs leading-relaxed text-zinc-500">
-					<span className="font-medium text-zinc-400">Example: </span>
-					{example}
-				</p>
-			)}
-			<div className="mt-1">{children}</div>
-		</div>
-	)
-}
 
 function AspectRatioPreview({ ratio }: { ratio: AspectRatio }) {
 	const sizes: Record<AspectRatio, string> = {

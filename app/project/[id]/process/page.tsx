@@ -379,7 +379,7 @@ export default function ProcessVideoPage() {
 								href={`/project/${projectId}/review`}
 								className="rounded-lg block bg-orange-600 px-6 py-3 text-center font-medium mb-4 text-white hover:bg-orange-700"
 							>
-								Proceed to editor
+								Proceed to review clips
 							</Link>
 						) : isFailed ? (
 							<button

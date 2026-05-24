@@ -1,3 +1,4 @@
+import path from "path"
 import type {
 	FinalScoreSource,
 	KeyMomentDetection,
@@ -9,7 +10,12 @@ export type ClipScoreSource = FinalScoreSource | "manual"
 export type ClipSegment = {
 	sourceFile: string
 	clipFile: string
+	/** Rank by finalScore within this clip's source file (1 = best from that file) */
 	rank: number
+	/** Rank by finalScore across every clip in the project (1 = best overall) */
+	globalRank?: number
+	/** Total clips cut for the project (denominator for globalRank) */
+	globalClipCount?: number
 	startSeconds: number
 	endSeconds: number
 	durationSeconds: number
@@ -106,27 +112,53 @@ export function describeSelection(
 export function describeSegmentOutcome(
 	segment: Pick<
 		ClipSegment,
+		| "sourceFile"
 		| "rank"
-		| "finalScore"
-		| "finalScoreSource"
+		| "globalRank"
+		| "globalClipCount"
 		| "selectedForUse"
 		| "totalCutsFromSource"
-		| "cvScoreStatus"
+		| "signalScoreDescription"
+		| "cvScoreDescription"
+		| "cvScoreError"
 	>,
 	clipsPerSourceFile: number
 ) {
-	const total = segment.totalCutsFromSource ?? 0
-	const hasCv = segment.cvScoreStatus === "scored"
+	const parts: string[] = []
+	const sourceLabel = path.basename(segment.sourceFile)
+	const perSourceTotal = segment.totalCutsFromSource ?? 0
+	const globalRank = segment.globalRank ?? 0
+	const globalTotal = segment.globalClipCount ?? 0
 
-	if (segment.selectedForUse) {
-		const basis =
-			segment.finalScoreSource === "blended" && !hasCv
-				? "signal score (CV unavailable)"
-				: `${segment.finalScoreSource} score`
-		return `Selected #${segment.rank} of ${total} cut(s) — top ${clipsPerSourceFile} by ${basis} (final ${segment.finalScore.toFixed(2)}).`
+	if (globalRank > 0 && globalTotal > 0) {
+		parts.push(`#${globalRank} of ${globalTotal} clips overall.`)
 	}
 
-	return `Rank ${segment.rank} of ${total} cut(s) — not in top ${clipsPerSourceFile} (final ${segment.finalScore.toFixed(2)}).`
+	const perSourceLine =
+		perSourceTotal > 0
+			? `${segment.rank} of ${perSourceTotal} from “${sourceLabel}”`
+			: `from “${sourceLabel}”`
+
+	if (segment.selectedForUse) {
+		parts.push(
+			`${perSourceLine}, among the top ${clipsPerSourceFile} from that file. Clips are chosen per source, not project-wide, so a stronger moment in another file does not replace this one.`
+		)
+	} else {
+		parts.push(
+			`Not selected — only the top ${clipsPerSourceFile} per source file are kept (${perSourceLine}).`
+		)
+	}
+
+	if (segment.signalScoreDescription?.trim()) {
+		parts.push(segment.signalScoreDescription.trim())
+	}
+	if (segment.cvScoreDescription?.trim()) {
+		parts.push(segment.cvScoreDescription.trim())
+	} else if (segment.cvScoreError?.trim()) {
+		parts.push(segment.cvScoreError.trim())
+	}
+
+	return parts.join("\n\n")
 }
 
 /** Backward-compatible read for manifests saved before signalScore rename */
@@ -154,6 +186,11 @@ export function normalizeClipSegment(
 		sourceFile: String(raw.sourceFile ?? ""),
 		clipFile: String(raw.clipFile ?? ""),
 		rank: typeof raw.rank === "number" ? raw.rank : 0,
+		globalRank: typeof raw.globalRank === "number" ? raw.globalRank : undefined,
+		globalClipCount:
+			typeof raw.globalClipCount === "number"
+				? raw.globalClipCount
+				: undefined,
 		startSeconds: typeof raw.startSeconds === "number" ? raw.startSeconds : 0,
 		endSeconds: typeof raw.endSeconds === "number" ? raw.endSeconds : 0,
 		durationSeconds:
@@ -244,7 +281,10 @@ export const CLIP_SEGMENT_LEGEND = {
 		"Which score drove rank: blended, signal, cv, or manual (override).",
 	manualFinalScore:
 		"Optional 0–1 override; when set, finalScore equals this and finalScoreSource is manual.",
-	rank: "Quality rank within the source file (1 = highest finalScore).",
+	rank: "Rank within the source file only (1 = highest finalScore from that file).",
+	globalRank:
+		"Rank across every clip in the project (1 = highest finalScore overall).",
+	globalClipCount: "Total clips cut in the project (denominator for globalRank).",
 	durationSeconds: "Actual exported clip length in seconds.",
 	targetDurationSeconds:
 		"Requested clip length from your min/max settings before edge clamping.",

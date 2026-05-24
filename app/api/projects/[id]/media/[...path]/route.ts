@@ -23,21 +23,35 @@ function videoContentType(filePath: string) {
 	return VIDEO_CONTENT_TYPES[ext] ?? mime.getType(filePath) ?? "application/octet-stream"
 }
 
-function resolveSourceFile(projectId: string, pathSegments: string[]) {
-	const fileName = pathSegments.map((segment) => decodeURIComponent(segment)).join("/")
+function resolveMediaFile(projectId: string, pathSegments: string[]) {
+	const relativePath = pathSegments
+		.map((segment) => decodeURIComponent(segment))
+		.join("/")
 
-	if (!fileName || fileName.includes("..") || path.basename(fileName) !== fileName) {
+	if (!relativePath || relativePath.includes("..")) {
 		return null
 	}
 
 	const projectRoot = path.resolve(path.join(PROJECTS_DIR, projectId))
-	const filePath = path.resolve(path.join(projectRoot, fileName))
+	let filePath: string
+
+	if (relativePath.startsWith("clips/")) {
+		const clipFile = relativePath.slice("clips/".length)
+		if (!clipFile || clipFile.includes("/") || path.basename(clipFile) !== clipFile) {
+			return null
+		}
+		filePath = path.resolve(path.join(projectRoot, "clips", clipFile))
+	} else if (path.basename(relativePath) === relativePath) {
+		filePath = path.resolve(path.join(projectRoot, relativePath))
+	} else {
+		return null
+	}
 
 	if (!filePath.startsWith(projectRoot + path.sep) && filePath !== projectRoot) {
 		return null
 	}
 
-	return { fileName, filePath }
+	return { fileName: relativePath, filePath }
 }
 
 function nodeStreamToWeb(stream: Readable) {
@@ -55,7 +69,7 @@ export async function GET(
 			return new Response("Missing project ID", { status: 400 })
 		}
 
-		const resolved = resolveSourceFile(projectId, pathSegments)
+		const resolved = resolveMediaFile(projectId, pathSegments)
 		if (!resolved) {
 			return new Response("Forbidden", { status: 403 })
 		}
