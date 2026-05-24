@@ -99,7 +99,7 @@ export default function Home() {
 
 						<Link
 							key={project.id}
-							href={`/project/${project.slug}`}
+							href={`/project/${project.id}`}
 							className="flex h-60 flex-col items-center justify-center rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 hover:border-orange-600/40 hover:bg-gray-700"
 						>
 							<span className="text-lg font-semibold text-white">
