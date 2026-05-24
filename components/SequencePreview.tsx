@@ -11,11 +11,14 @@ export function SequencePreview({
 	edit,
 	playheadSeconds,
 	isPlaying,
+	volume = 0,
 }: {
 	projectId: string
 	edit: ProjectEdit
 	playheadSeconds: number
 	isPlaying: boolean
+	/** 0–1 */
+	volume?: number
 }) {
 	const videoRef = useRef<HTMLVideoElement>(null)
 	const loadedClipIdRef = useRef<string | null>(null)
@@ -68,6 +71,14 @@ export function SequencePreview({
 		syncVideoToPlayhead(frame)
 	}, [frame, playheadSeconds, syncVideoToPlayhead])
 
+	useEffect(() => {
+		const video = videoRef.current
+		if (!video) return
+		const level = Math.min(1, Math.max(0, volume))
+		video.volume = level
+		video.muted = level === 0
+	}, [volume])
+
 	if (!frame) {
 		return (
 			<div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center bg-black px-4">
@@ -84,7 +95,7 @@ export function SequencePreview({
 			<video
 				ref={videoRef}
 				className="h-full w-full object-contain"
-				muted
+				muted={volume <= 0}
 				playsInline
 				preload="auto"
 			/>

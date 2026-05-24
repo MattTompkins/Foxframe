@@ -5,6 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { ChevronDown, Loader2 } from "lucide-react"
 import { Modal } from "@/components/Modal"
 import type { EditSummary, ProjectEdit } from "@/lib/edit"
+import {
+	DEFAULT_VIDEO_SETTINGS,
+	type VideoSettings,
+} from "@/lib/video-settings"
 
 function formatEditDuration(seconds: number) {
     if (seconds < 60) {
@@ -25,14 +29,26 @@ function formatEditDate(iso: string) {
     })
 }
 
+function settingsSummary(settings: VideoSettings) {
+	return [
+		`Resolution ${settings.outputResolution.replace("x", " × ")}`,
+		settings.outputFormat.toUpperCase(),
+		settings.outputCodec === "h265" ? "H.265" : "H.264",
+		settings.framingMode,
+		settings.aspectRatio,
+	].join(" · ")
+}
+
 export function EditorHeader({
     projectId,
     projectName,
+    projectSlug,
     currentEditId,
     onEditLoaded,
 }: {
     projectId: string
     projectName: string
+    projectSlug: string
     currentEditId?: string | null
     onEditLoaded?: (edit: ProjectEdit) => void
 }) {
@@ -47,6 +63,14 @@ export function EditorHeader({
     const [loadingEditId, setLoadingEditId] = useState<string | null>(null)
     const menuRef = useRef<HTMLDivElement>(null)
     const nameInputRef = useRef<HTMLInputElement>(null)
+    const [exportModalOpen, setExportModalOpen] = useState(false)
+    const [exportSettings, setExportSettings] = useState<VideoSettings | null>(
+        null
+    )
+    const [exportCrf, setExportCrf] = useState(DEFAULT_VIDEO_SETTINGS.crf)
+    const [exporting, setExporting] = useState(false)
+    const [exportError, setExportError] = useState<string | null>(null)
+    const [exportLoadingSettings, setExportLoadingSettings] = useState(false)
 
     const fetchEdits = useCallback(async () => {
         setListLoading(true)
@@ -123,6 +147,95 @@ export function EditorHeader({
         if (savingNew) return
         setSaveModalOpen(false)
         setSaveError(null)
+    }
+
+    async function openExportModal() {
+        if (!currentEditId) return
+
+        setExportModalOpen(true)
+        setExportError(null)
+        setExportLoadingSettings(true)
+
+        try {
+            const res = await fetch(`/api/projects/${projectId}/settings`)
+            const data = await res.json().catch(() => ({}))
+
+            if (!res.ok) {
+                throw new Error(
+                    typeof data.error === "string"
+                        ? data.error
+                        : "Failed to load project settings"
+                )
+            }
+
+            const settings = data.settings as VideoSettings
+            setExportSettings(settings)
+            setExportCrf(settings.crf)
+        } catch (err) {
+            setExportError(
+                err instanceof Error ? err.message : "Failed to load settings"
+            )
+            setExportSettings(null)
+        } finally {
+            setExportLoadingSettings(false)
+        }
+    }
+
+    function closeExportModal() {
+        if (exporting) return
+        setExportModalOpen(false)
+        setExportError(null)
+    }
+
+    async function confirmExport() {
+        if (!currentEditId) return
+
+        setExporting(true)
+        setExportError(null)
+
+        try {
+            const res = await fetch(
+                `/api/projects/${projectId}/edits/${currentEditId}/export`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        settingsOverrides: { crf: exportCrf },
+                    }),
+                }
+            )
+            const data = await res.json().catch(() => ({}))
+
+            if (!res.ok) {
+                throw new Error(
+                    typeof data.error === "string"
+                        ? data.error
+                        : "Export failed"
+                )
+            }
+
+            const downloadUrl =
+                typeof data.downloadUrl === "string" ? data.downloadUrl : null
+            const filename =
+                typeof data.export?.filename === "string"
+                    ? data.export.filename
+                    : `${projectSlug}.mp4`
+
+            if (downloadUrl) {
+                const link = document.createElement("a")
+                link.href = downloadUrl
+                link.download = filename
+                link.click()
+            }
+
+            setExportModalOpen(false)
+        } catch (err) {
+            setExportError(
+                err instanceof Error ? err.message : "Export failed"
+            )
+        } finally {
+            setExporting(false)
+        }
     }
 
     async function confirmSaveNewEdit() {
@@ -333,11 +446,96 @@ export function EditorHeader({
 
                 <button
                     type="button"
-                    className="rounded-lg bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-zinc-900 sm:px-4 sm:py-2.5"
+                    disabled={!currentEditId}
+                    onClick={() => void openExportModal()}
+                    className="rounded-lg bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2.5"
                 >
                     Export
                 </button>
             </nav>
+
+            {exportModalOpen && (
+                <Modal
+                    title="Export sequence"
+                    subtitle={`Render and export your current edit. Download as ${projectSlug}.${exportSettings?.outputFormat ?? "mp4"}.`}
+                    onExit={closeExportModal}
+                >
+                    {exportLoadingSettings ? (
+                        <p className="mb-4 text-sm text-zinc-400">
+                            Loading project settings…
+                        </p>
+                    ) : exportSettings ? (
+                        <div className="mb-4 space-y-3">
+                            <p className="text-sm text-zinc-300">
+                                Export settings defined in {" "}
+                                <Link
+                                    href={`/project/${projectId}/settings`}
+                                    className="text-orange-400 hover:text-orange-300"
+                                >
+                                    project settings
+                                </Link>
+                                :
+                            </p>
+                            <p className="rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-400">
+                                {settingsSummary(exportSettings)}
+                            </p>
+                            <label
+                                htmlFor="export-crf"
+                                className="block text-sm font-medium text-zinc-300"
+                            >
+                                Quality (CRF {exportCrf}) — lower is higher quality
+                            </label>
+                            <input
+                                id="export-crf"
+                                type="range"
+                                min={15}
+                                max={28}
+                                step={1}
+                                value={exportCrf}
+                                onChange={(event) =>
+                                    setExportCrf(parseInt(event.target.value, 10))
+                                }
+                                disabled={exporting}
+                                className="w-full accent-orange-500"
+                            />
+                            <div className="flex justify-between text-xs text-zinc-500">
+                                <span>Best quality (15)</span>
+                                <span>Smaller file (28)</span>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {exportError && (
+                        <p className="mb-4 text-sm text-red-300">{exportError}</p>
+                    )}
+
+                    <div className="flex justify-end gap-3">
+                        <button
+                            type="button"
+                            className="rounded-lg border border-zinc-600 px-4 py-2 text-sm text-white hover:bg-zinc-700 disabled:opacity-50"
+                            onClick={closeExportModal}
+                            disabled={exporting}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                            onClick={() => void confirmExport()}
+                            disabled={
+                                exporting ||
+                                exportLoadingSettings ||
+                                !exportSettings
+                            }
+                        >
+                            {exporting ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : null}
+                            {exporting ? "Exporting…" : "Export & download"}
+                        </button>
+                    </div>
+                </Modal>
+            )}
 
             {saveModalOpen && (
                 <Modal

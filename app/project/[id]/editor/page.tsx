@@ -33,6 +33,8 @@ type ProjectDetails = {
 	slug: string
 }
 
+const DEFAULT_PROJECT_SLUG = "export"
+
 type EditorProjectData = {
 	project: ProjectDetails
 	clips: string[]
@@ -90,6 +92,7 @@ export default function EditorPage() {
 	const projectId = useParams().id as string
 
 	const [projectName, setProjectName] = useState("Loading…")
+	const [projectSlug, setProjectSlug] = useState(DEFAULT_PROJECT_SLUG)
 	const [clips, setClips] = useState<string[]>([])
 	const [clipSegments, setClipSegments] = useState<ClipSegment[]>([])
 	const [sourcePreviewClip, setSourcePreviewClip] = useState<string | null>(
@@ -97,6 +100,7 @@ export default function EditorPage() {
 	)
 	const [currentEdit, setCurrentEdit] = useState<ProjectEdit | null>(null)
 	const [isPlaying, setIsPlaying] = useState(false)
+	const [volume, setVolume] = useState(0)
 	const [editLoading, setEditLoading] = useState(true)
 	const [editSaving, setEditSaving] = useState(false)
 	const [editPersistError, setEditPersistError] = useState<string | null>(null)
@@ -170,6 +174,7 @@ export default function EditorPage() {
 				if (cancelled) return
 
 				setProjectName(data.project.name)
+				setProjectSlug(data.project.slug || DEFAULT_PROJECT_SLUG)
 				setClips(data.clips)
 				setClipSegments(data.clipSegments)
 				setSourcePreviewClip(null)
@@ -181,6 +186,7 @@ export default function EditorPage() {
 							: "Failed to load editor data"
 					)
 					setProjectName("Project")
+					setProjectSlug(DEFAULT_PROJECT_SLUG)
 					setClips([])
 					setClipSegments([])
 					setSourcePreviewClip(null)
@@ -310,6 +316,7 @@ export default function EditorPage() {
 			<EditorHeader
 				projectId={projectId}
 				projectName={projectName}
+				projectSlug={projectSlug}
 				currentEditId={currentEdit?.id}
 				onEditLoaded={handleEditLoaded}
 			/>
@@ -398,7 +405,7 @@ export default function EditorPage() {
 								source={clipMediaUrl(projectId, sourcePreviewClip)}
 								clipFileName={sourcePreviewClip}
 								autoPlay
-								muted
+								muted={volume <= 0}
 								loop
 							/>
 						</div>
@@ -408,6 +415,7 @@ export default function EditorPage() {
 							edit={currentEdit}
 							playheadSeconds={playheadSeconds}
 							isPlaying={isPlaying}
+							volume={volume}
 						/>
 					) : (
 						<div className="flex h-full min-h-0 flex-1 items-center justify-center bg-black">
@@ -444,6 +452,8 @@ export default function EditorPage() {
 						}}
 						isPlaying={isPlaying}
 						onPlayToggle={handlePlayToggle}
+						volume={volume}
+						onVolumeChange={setVolume}
 						onEditChange={(next) => updateEdit(() => next)}
 						onAddClipFromAsset={(clipFile, trackId, startOnTimeline) => {
 							const duration = clipDurationFromSegments(

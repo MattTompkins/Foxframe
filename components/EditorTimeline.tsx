@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Film, Mic, Pause, Play } from "lucide-react"
+import { Film, Mic, Pause, Play, Volume2, VolumeX } from "lucide-react"
 import {
 	CLIP_DRAG_MIME,
 	addTrackToEdit,
@@ -92,6 +92,8 @@ export function EditorTimeline({
 	onAddClipFromAsset,
 	isPlaying = false,
 	onPlayToggle,
+	volume = 0,
+	onVolumeChange,
 	pxPerSec = DEFAULT_PX_PER_SEC,
 	saving = false,
 }: {
@@ -106,6 +108,9 @@ export function EditorTimeline({
 	) => void
 	isPlaying?: boolean
 	onPlayToggle?: () => void
+	/** 0–1 playback volume for the canvas preview. */
+	volume?: number
+	onVolumeChange?: (volume: number) => void
 	pxPerSec?: number
 	saving?: boolean
 }) {
@@ -348,6 +353,29 @@ export function EditorTimeline({
 						<Mic className="h-3.5 w-3.5" />
 						Add audio track
 					</button>
+					{onVolumeChange && (
+						<label className="inline-flex items-center gap-1.5 rounded-md border border-zinc-600 bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-200">
+							{volume <= 0 ? (
+								<VolumeX className="h-3.5 w-3.5 shrink-0" aria-hidden />
+							) : (
+								<Volume2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+							)}
+							<input
+								type="range"
+								min={0}
+								max={100}
+								step={1}
+								value={Math.round(volume * 100)}
+								onChange={(event) =>
+									onVolumeChange(
+										parseInt(event.target.value, 10) / 100
+									)
+								}
+								className="h-1 w-16 cursor-pointer accent-orange-500"
+								aria-label="Preview volume"
+							/>
+						</label>
+					)}
 					<p className="text-xs tabular-nums text-zinc-400 min-w-10 text-right">
 						{formatRulerLabel(Math.round(playheadSeconds * 10) / 10)}
 					</p>
