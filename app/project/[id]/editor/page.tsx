@@ -460,6 +460,9 @@ export default function EditorPage() {
 							)
 						}}
 						saving={editSaving}
+						clipSourceDuration={(clipFile) =>
+							clipDurationFromSegments(clipFile, clipSegments)
+						}
 					/>
 				)}
 			</EditorResizablePanel>

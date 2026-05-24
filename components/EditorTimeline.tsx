@@ -8,6 +8,7 @@ import {
 	moveTimelineClip,
 	removeTimelineClip,
 	snapToFrame,
+	trimTimelineClip,
 } from "@/lib/edit-client"
 import {
 	clipTimelineDuration,
@@ -23,7 +24,23 @@ const RULER_HEIGHT = 28
 const TRACK_ROW_HEIGHT = 52
 const MIN_TIMELINE_SECONDS = 12
 const DEFAULT_PX_PER_SEC = 64
+const MIN_CLIP_DURATION_SECONDS = 0.001
 const CLIP_DRAG_THRESHOLD_PX = 5
+const TRIM_HANDLE_WIDTH_PX = 8
+
+type ClipTrimEdge = "left" | "right"
+
+type ClipTrimState = {
+	clipId: string
+	edge: ClipTrimEdge
+	pointerId: number
+	originStartOnTimeline: number
+	originSourceIn: number
+	originSourceOut: number
+	previewStartOnTimeline: number
+	previewSourceIn: number
+	previewSourceOut: number
+}
 
 type ClipDragState = {
 	clipId: string
@@ -132,6 +149,89 @@ function resolveClipPlacement(
 	}
 }
 
+function minClipDuration(fps: number) {
+	return fps > 0 ? 1 / fps : MIN_CLIP_DURATION_SECONDS
+}
+
+function previewTrimLeft(
+	origin: {
+		startOnTimeline: number
+		sourceIn: number
+		sourceOut: number
+	},
+	pointerTime: number,
+	fps: number
+) {
+	const minDuration = minClipDuration(fps)
+	const originDuration = origin.sourceOut - origin.sourceIn
+	const originEnd = origin.startOnTimeline + originDuration
+
+	let newStart = Math.max(0, Math.min(pointerTime, originEnd - minDuration))
+	const delta = newStart - origin.startOnTimeline
+	let newSourceIn = origin.sourceIn + delta
+	newSourceIn = Math.max(
+		0,
+		Math.min(newSourceIn, origin.sourceOut - minDuration)
+	)
+
+	const actualDelta = newSourceIn - origin.sourceIn
+	newStart = origin.startOnTimeline + actualDelta
+
+	return {
+		startOnTimeline: roundTimelineSeconds(newStart),
+		sourceIn: roundTimelineSeconds(newSourceIn),
+		sourceOut: origin.sourceOut,
+	}
+}
+
+function previewTrimRight(
+	origin: {
+		startOnTimeline: number
+		sourceIn: number
+		sourceOut: number
+	},
+	pointerTime: number,
+	fps: number,
+	maxSourceDuration: number
+) {
+	const minDuration = minClipDuration(fps)
+	let newEnd = Math.max(
+		origin.startOnTimeline + minDuration,
+		pointerTime
+	)
+
+	let newSourceOut =
+		origin.sourceIn + (newEnd - origin.startOnTimeline)
+	newSourceOut = Math.min(
+		maxSourceDuration,
+		Math.max(newSourceOut, origin.sourceIn + minDuration)
+	)
+
+	return {
+		startOnTimeline: origin.startOnTimeline,
+		sourceIn: origin.sourceIn,
+		sourceOut: roundTimelineSeconds(newSourceOut),
+	}
+}
+
+function resolveClipDisplay(
+	clip: TimelineClip,
+	drag: ClipDragState | null,
+	trim: ClipTrimState | null
+): TimelineClip {
+	if (trim?.clipId === clip.id) {
+		return {
+			...clip,
+			startOnTimeline: trim.previewStartOnTimeline,
+			sourceIn: trim.previewSourceIn,
+			sourceOut: trim.previewSourceOut,
+		}
+	}
+
+	const placement = resolveClipPlacement(clip, drag)
+	return { ...clip, ...placement }
+}
+
 export function EditorTimeline({
 	edit,
 	playheadSeconds,
@@ -144,6 +244,7 @@ export function EditorTimeline({
 	onVolumeChange,
 	pxPerSec = DEFAULT_PX_PER_SEC,
 	saving = false,
+	clipSourceDuration,
 }: {
 	edit: ProjectEdit
 	playheadSeconds: number
@@ -161,6 +262,8 @@ export function EditorTimeline({
 	onVolumeChange?: (volume: number) => void
 	pxPerSec?: number
 	saving?: boolean
+	/** Full media duration for a clip file (seconds). */
+	clipSourceDuration?: (clipFile: string) => number
 }) {
 	const verticalScrollRef = useRef<HTMLDivElement>(null)
 	const horizontalScrollRef = useRef<HTMLDivElement>(null)
@@ -171,12 +274,15 @@ export function EditorTimeline({
 		useState<PendingClipPointer | null>(null)
 	const pendingClipPointerRef = useRef<PendingClipPointer | null>(null)
 	const [selectedClipId, setSelectedClipId] = useState<string | null>(null)
+	const [clipTrim, setClipTrim] = useState<ClipTrimState | null>(null)
+	const clipTrimRef = useRef<ClipTrimState | null>(null)
 	const [dropTargetTrackId, setDropTargetTrackId] = useState<string | null>(
 		null
 	)
 
 	clipDragRef.current = clipDrag
 	pendingClipPointerRef.current = pendingClipPointer
+	clipTrimRef.current = clipTrim
 
 	useEffect(() => {
 		if (
@@ -201,17 +307,16 @@ export function EditorTimeline({
 			map.set(track.id, [])
 		}
 		for (const clip of edit.clips) {
-			const placement = resolveClipPlacement(clip, clipDrag)
-			const placed = { ...clip, ...placement }
-			const list = map.get(placement.trackId)
+			const display = resolveClipDisplay(clip, clipDrag, clipTrim)
+			const list = map.get(display.trackId)
 			if (list) {
-				list.push(placed)
+				list.push(display)
 			} else {
-				map.set(placement.trackId, [placed])
+				map.set(display.trackId, [display])
 			}
 		}
 		return map
-	}, [edit.clips, edit.tracks, clipDrag])
+	}, [edit.clips, edit.tracks, clipDrag, clipTrim])
 
 	const rulerTicks = useMemo(() => {
 		const ticks: number[] = []
@@ -312,6 +417,42 @@ export function EditorTimeline({
 		[timeAtClientX]
 	)
 
+	const getMaxSourceDuration = useCallback(
+		(clip: TimelineClip) => {
+			const fromManifest = clipSourceDuration?.(clip.clipFile)
+			if (fromManifest && fromManifest > 0) return fromManifest
+			return clip.sourceOut
+		},
+		[clipSourceDuration]
+	)
+
+	const beginTrimHandle = useCallback(
+		(
+			event: React.PointerEvent,
+			clip: TimelineClip,
+			edge: ClipTrimEdge
+		) => {
+			event.stopPropagation()
+			event.preventDefault()
+			setSelectedClipId(clip.id)
+
+			setClipTrim({
+				clipId: clip.id,
+				edge,
+				pointerId: event.pointerId,
+				originStartOnTimeline: clip.startOnTimeline,
+				originSourceIn: clip.sourceIn,
+				originSourceOut: clip.sourceOut,
+				previewStartOnTimeline: clip.startOnTimeline,
+				previewSourceIn: clip.sourceIn,
+				previewSourceOut: clip.sourceOut,
+			})
+
+			event.currentTarget.setPointerCapture(event.pointerId)
+		},
+		[]
+	)
+
 	const promotePendingToDrag = useCallback((pending: PendingClipPointer) => {
 		setClipDrag({
 			clipId: pending.clipId,
@@ -353,6 +494,7 @@ export function EditorTimeline({
 		if (!clipDrag && !pendingClipPointer) return
 
 		function onPointerMove(event: PointerEvent) {
+			if (clipTrimRef.current) return
 			const pending = pendingClipPointerRef.current
 			if (pending && event.pointerId === pending.pointerId) {
 				const dx = event.clientX - pending.startClientX
@@ -427,6 +569,66 @@ export function EditorTimeline({
 		promotePendingToDrag,
 		timeAtClientX,
 	])
+
+	useEffect(() => {
+		if (!clipTrim) return
+
+		function onPointerMove(event: PointerEvent) {
+			const trim = clipTrimRef.current
+			if (!trim || event.pointerId !== trim.pointerId) return
+
+			const original = edit.clips.find((c) => c.id === trim.clipId)
+			if (!original) return
+
+			const pointerTime = snapToFrame(timeAtClientX(event.clientX), edit.fps)
+			const origin = {
+				startOnTimeline: trim.originStartOnTimeline,
+				sourceIn: trim.originSourceIn,
+				sourceOut: trim.originSourceOut,
+			}
+
+			const preview =
+				trim.edge === "left"
+					? previewTrimLeft(origin, pointerTime, edit.fps)
+					: previewTrimRight(
+							origin,
+							pointerTime,
+							edit.fps,
+							getMaxSourceDuration(original)
+						)
+
+			setClipTrim({
+				...trim,
+				previewStartOnTimeline: preview.startOnTimeline,
+				previewSourceIn: preview.sourceIn,
+				previewSourceOut: preview.sourceOut,
+			})
+		}
+
+		function finishTrim(event: PointerEvent) {
+			const trim = clipTrimRef.current
+			if (!trim || event.pointerId !== trim.pointerId) return
+
+			const trimmed = trimTimelineClip(edit, trim.clipId, {
+				startOnTimeline: trim.previewStartOnTimeline,
+				sourceIn: trim.previewSourceIn,
+				sourceOut: trim.previewSourceOut,
+			})
+			onEditChange(trimmed)
+			setSelectedClipId(trim.clipId)
+			setClipTrim(null)
+		}
+
+		document.addEventListener("pointermove", onPointerMove)
+		document.addEventListener("pointerup", finishTrim)
+		document.addEventListener("pointercancel", finishTrim)
+
+		return () => {
+			document.removeEventListener("pointermove", onPointerMove)
+			document.removeEventListener("pointerup", finishTrim)
+			document.removeEventListener("pointercancel", finishTrim)
+		}
+	}, [clipTrim, edit, getMaxSourceDuration, onEditChange, timeAtClientX])
 
 	const handleAssetDragOver = useCallback(
 		(event: React.DragEvent, trackId: string) => {
@@ -583,9 +785,11 @@ export function EditorTimeline({
 									aria-valuemax={timelineSeconds}
 									aria-valuenow={playheadSeconds}
 									className="sticky top-0 z-30 cursor-crosshair border-b border-zinc-700/80 bg-zinc-950/95 backdrop-blur-sm"
-									style={{ height: RULER_HEIGHT }}
+									style={{ height: RULER_HEIGHT, userSelect: "none" }}
 									onPointerDown={(event) => {
-										if (clipDrag || pendingClipPointer) return
+										if (clipDrag || pendingClipPointer || clipTrim) {
+											return
+										}
 										handleTimelineSeek(event.clientX)
 										event.currentTarget.setPointerCapture(
 											event.pointerId
@@ -595,6 +799,7 @@ export function EditorTimeline({
 										if (
 											clipDrag ||
 											pendingClipPointer ||
+											clipTrim ||
 											event.buttons !== 1
 										) {
 											return
@@ -628,7 +833,7 @@ export function EditorTimeline({
 												isDropTarget
 													? "bg-orange-500/10 ring-1 ring-inset ring-orange-500/40"
 													: "bg-zinc-900/40"
-											} ${clipDrag ? "cursor-grabbing" : "cursor-crosshair"}`}
+											} ${clipDrag || clipTrim ? "cursor-grabbing" : "cursor-crosshair"}`}
 											style={{ height: TRACK_ROW_HEIGHT }}
 											onDragEnter={() =>
 												setDropTargetTrackId(track.id)
@@ -650,7 +855,13 @@ export function EditorTimeline({
 												handleAssetDrop(event, track.id)
 											}
 											onPointerDown={(event) => {
-												if (clipDrag || pendingClipPointer) return
+												if (
+													clipDrag ||
+													pendingClipPointer ||
+													clipTrim
+												) {
+													return
+												}
 												handleTimelineSeek(event.clientX)
 												event.currentTarget.setPointerCapture(
 													event.pointerId
@@ -660,6 +871,7 @@ export function EditorTimeline({
 												if (
 													clipDrag ||
 													pendingClipPointer ||
+													clipTrim ||
 													event.buttons !== 1
 												) {
 													return
@@ -668,18 +880,21 @@ export function EditorTimeline({
 											}}
 										>
 											{trackClips.map((clip, index) => {
-												const placement = resolveClipPlacement(
-													clip,
-													clipDrag
-												)
+												const originalClip =
+													edit.clips.find(
+														(c) => c.id === clip.id
+													) ?? clip
 												const isDragging =
 													clipDrag?.clipId === clip.id
+												const isTrimming =
+													clipTrim?.clipId === clip.id
 												const isSelected =
 													selectedClipId === clip.id
 												const width =
-													clipTimelineDuration(clip) * pxPerSec
+													clipTimelineDuration(clip) *
+													pxPerSec
 												const left =
-													placement.startOnTimeline * pxPerSec
+													clip.startOnTimeline * pxPerSec
 
 												return (
 													<div
@@ -690,22 +905,69 @@ export function EditorTimeline({
 															beginClipPointerDown(
 																event,
 																clip,
-																placement
+																{
+																	startOnTimeline:
+																		clip.startOnTimeline,
+																	trackId:
+																		clip.trackId,
+																}
 															)
 														}
-														className={`absolute top-1 bottom-1 flex min-w-[2px] cursor-grab items-center overflow-hidden rounded border px-1 text-[10px] font-medium text-white active:cursor-grabbing ${trackClipColor(track, index, isDragging, isSelected)}`}
+														className={`absolute top-1 bottom-1 border-x-3 border-x-orange-400 flex min-w-[2px] cursor-grab items-center overflow-hidden rounded border text-[10px] font-medium text-white active:cursor-grabbing ${trackClipColor(track, index, isDragging, isSelected || isTrimming)}`}
 														style={{
 															left,
-															width: Math.max(width, 4),
+															width: Math.max(
+																width,
+																TRIM_HANDLE_WIDTH_PX *
+																	2
+															),
 															zIndex: isDragging
 																? 60
-																: 10 + index,
+																: isTrimming
+																	? 55
+																	: 10 + index,
 														}}
-														title={`${basename(clip.clipFile)} · drag to move · Delete to remove`}
+														title={`${basename(clip.clipFile)} · drag to move · drag edges to trim · Delete to remove`}
 													>
-														<span className="pointer-events-none truncate">
-															{basename(clip.clipFile)}
+														<button
+															type="button"
+															aria-label="Trim clip start"
+															className="absolute inset-y-0 left-0 z-10 w-2 shrink-0 cursor-ew-resize touch-none border-l-2 border-white/0 hover:border-white/70 active:border-white"
+															style={{
+																width: TRIM_HANDLE_WIDTH_PX,
+															}}
+															onPointerDown={(
+																event
+															) =>
+																beginTrimHandle(
+																	event,
+																	originalClip,
+																	"left"
+																)
+															}
+														/>
+														<span className="pointer-events-none min-w-0 flex-1 truncate px-1 text-center">
+															{basename(
+																clip.clipFile
+															)}
 														</span>
+														<button
+															type="button"
+															aria-label="Trim clip end"
+															className="absolute inset-y-0 right-0 z-10 w-2 shrink-0 cursor-ew-resize touch-none border-r-2 border-white/0 hover:border-white/70 active:border-white"
+															style={{
+																width: TRIM_HANDLE_WIDTH_PX,
+															}}
+															onPointerDown={(
+																event
+															) =>
+																beginTrimHandle(
+																	event,
+																	originalClip,
+																	"right"
+																)
+															}
+														/>
 													</div>
 												)
 											})}

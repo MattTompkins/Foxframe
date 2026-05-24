@@ -109,6 +109,32 @@ export function removeTimelineClip(
 	})
 }
 
+export function trimTimelineClip(
+	edit: ProjectEdit,
+	clipId: string,
+	patch: {
+		startOnTimeline: number
+		sourceIn: number
+		sourceOut: number
+	}
+): ProjectEdit {
+	const clips = edit.clips.map((clip) => {
+		if (clip.id !== clipId) return clip
+		return normalizeTimelineClip({
+			...clip,
+			startOnTimeline: patch.startOnTimeline,
+			sourceIn: patch.sourceIn,
+			sourceOut: patch.sourceOut,
+		})
+	})
+
+	return normalizeProjectEdit({
+		...edit,
+		clips,
+		updatedAt: new Date().toISOString(),
+	})
+}
+
 export function addTrackToEdit(
 	edit: ProjectEdit,
 	type: EditTrackType
