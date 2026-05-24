@@ -8,6 +8,7 @@ import { EditorHeader } from "@/components/EditorHeader"
 import { EditorPanel } from "@/components/EditorPanel"
 import { VideoPlayer } from "@/components/VideoPlayer"
 import type { ClipSegment } from "@/lib/clip-segments"
+import type { ProjectEdit } from "@/lib/edit"
 
 type ProjectDetails = {
 	id: string
@@ -65,6 +66,7 @@ export default function EditorPage() {
 	const [clips, setClips] = useState<string[]>([])
 	const [clipSegments, setClipSegments] = useState<ClipSegment[]>([])
 	const [selectedClipFile, setSelectedClipFile] = useState<string | null>(null)
+	const [currentEdit, setCurrentEdit] = useState<ProjectEdit | null>(null)
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
@@ -114,7 +116,12 @@ export default function EditorPage() {
 
 	return (
 		<div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-zinc-950 font-sans text-zinc-100">
-			<EditorHeader projectId={projectId} projectName={projectName} />
+			<EditorHeader
+				projectId={projectId}
+				projectName={projectName}
+				currentEditId={currentEdit?.id}
+				onEditLoaded={setCurrentEdit}
+			/>
 
 			{error && (
 				<p className="shrink-0 border-b border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">
