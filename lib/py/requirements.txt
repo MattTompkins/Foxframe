@@ -1,0 +1,34 @@
+# Foxframe CV clip scoring — runs on your local machine after the model is downloaded
+# Python 3.11+ recommended (3.12 works well on macOS)
+#
+# Hugging Face / rate limits:
+#   - pip packages (transformers, torch) are local libraries, not a cloud API.
+#   - On first run, weights download from huggingface.co (~350MB for CLIP base).
+#     That is a one-time file fetch, not per-clip inference. No per-request billing.
+#   - After download, scoring uses only local files (default cache:
+#     ~/.cache/huggingface/hub/). No network required unless you pull a new model.
+#   - Optional fully offline after download: export HF_HUB_OFFLINE=1
+#
+# Setup:
+#   cd lib/py
+#   python3 -m venv .venv
+#   source .venv/bin/activate   # Windows: .venv\Scripts\activate
+#   pip install -U pip
+#   pip install -r requirements.txt
+#
+# Default model (in code): openai/clip-vit-base-patch32
+# Heavier / sharper prompts: openai/clip-vit-large-patch14
+
+# CLIP via Hugging Face — image/text similarity for positive & negative prompts
+transformers>=4.44.0,<5
+accelerate>=0.33.0
+
+# PyTorch — CPU, CUDA, or Apple MPS (Metal) depending on your machine
+torch>=2.4.0,<3
+
+# Decode video and sample frames (pair with ffmpeg on PATH for odd codecs)
+av>=13.0.0
+
+# Frame tensors / arrays for CLIP preprocessor
+numpy>=2.0.0,<3
+Pillow>=10.4.0
