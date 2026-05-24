@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { StepCounter } from "@/components/StepCounter"
 import { useParams } from "next/navigation"
 import {
 	CheckCircle2,
@@ -27,7 +28,7 @@ const STAGE_ICONS: Record<ProcessStage, typeof Settings2> = {
 	preparing: Settings2,
 	analysing: FileSearch,
 	processing: Clapperboard,
-	finalizing: Loader2,
+	saving: Loader2,
 	complete: CheckCircle2,
 	error: XCircle,
 }
@@ -266,9 +267,7 @@ export default function ProcessVideoPage() {
 		<div className="flex min-h-full flex-1 flex-col bg-zinc-900 font-sans">
 			<main className="mx-auto flex w-full max-w-3xl flex-col px-6 py-16 sm:py-24">
 				<header className="mb-10">
-					<p className="text-sm font-medium uppercase tracking-wide text-blue-400">
-						Step 3 of 3 · Processing
-					</p>
+					<StepCounter current={3} total={4} stepName="Video formatting & processing" />
 					<h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">
 						{isDone
 							? "Your videos are ready"
@@ -328,6 +327,26 @@ export default function ProcessVideoPage() {
 							error={status?.error}
 							failedAtStage={status?.failedAtStage}
 						/>
+					</div>
+
+					<div className="mt-8">
+						{isDone ? (
+							<Link
+								href={`/project/${projectId}/files`}
+								className="rounded-lg block bg-blue-600 px-6 py-3 text-center font-medium mb-4 text-white hover:bg-blue-700"
+							>
+								Proceed to editor
+							</Link>
+						) : isFailed ? (
+							<button
+								type="button"
+								onClick={handleRetry}
+								disabled={starting}
+								className="rounded-lg bg-red-600 px-6 py-3 text-center font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								Retry processing
+							</button>
+						) : null}
 					</div>
 				</section>
 

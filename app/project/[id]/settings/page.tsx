@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { StepCounter } from "@/components/StepCounter"
 import {
 	DEFAULT_VIDEO_SETTINGS,
 	type AspectRatio,
@@ -161,9 +162,7 @@ export default function ProjectSettingsPage() {
 		<div className="flex min-h-full flex-1 flex-col bg-zinc-900 font-sans">
 			<main className="mx-auto flex w-full max-w-3xl flex-col px-6 py-16 sm:py-24">
 				<header className="mb-10">
-					<p className="text-sm font-medium uppercase tracking-wide text-blue-400">
-						Step 2 of 3 · Output settings
-					</p>
+					<StepCounter current={2} total={4} stepName="Output settings" />
 					<h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">
 						How should your videos look?
 					</h1>

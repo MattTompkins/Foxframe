@@ -204,7 +204,7 @@ async function setStatus(
 
 export async function processProjectVideos(projectId: string) {
 	const existing = await readProcessStatus(projectId)
-	if (["preparing", "analysing", "processing", "finalizing"].includes(existing.stage)) {
+	if (["preparing", "analysing", "processing", "saving"].includes(existing.stage)) {
 		return
 	}
 
@@ -375,9 +375,9 @@ export async function processProjectVideos(projectId: string) {
 		}
 
 		await setStatus(projectId, {
-			stage: "finalizing",
+			stage: "saving",
 			overallProgress: 92,
-			message: "Updating project manifest…",
+			message: "Saving processed videos…",
 			currentFile: undefined,
 		})
 

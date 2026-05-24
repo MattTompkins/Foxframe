@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useParams } from "next/navigation"
 import FileBrowser from "@/components/FileBrowser"
+import { StepCounter } from "@/components/StepCounter"
 import { isVideoFileName, VIDEO_EXTENSIONS_LABEL } from "@/lib/video-files"
 
 type Props = {
@@ -97,11 +98,12 @@ export default function ProjectFilesPage({ params }: Props) {
 
 			<main className="flex w-full max-w-3xl flex-col items-center justify-between py-32 sm:items-start">
 
-				<h1 className="text-6xl font-bold text-white">
+				<StepCounter current={1} total={4} stepName="Upload raw media files" />
+				<h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">
 					Choose your media
 				</h1>
 
-				<p className="text-2xl text-gray-300 mt-3 mb-6">
+				<p className="mt-4 text-lg leading-relaxed text-zinc-300 mb-10">
 					Configure your upload settings and then upload your media files to get started.
 				</p>
 
@@ -110,6 +112,7 @@ export default function ProjectFilesPage({ params }: Props) {
 						<input
 							type="checkbox"
 							checked={renumberFilesOption}
+							className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
 							onChange={(e) =>
 								setRenumberFilesOption(e.target.checked)
 							}
@@ -123,7 +126,7 @@ export default function ProjectFilesPage({ params }: Props) {
 					onDragOver={handleDragOver}
 					onDragLeave={handleDragLeave}
 					onDrop={handleDrop}
-					className={`mt-10 h-60 w-full rounded-lg border-2 border-dashed transition-colors ${isDragging
+					className={`mt-6 h-60 w-full rounded-lg border-2 border-dashed transition-colors ${isDragging
 							? "border-blue-500 bg-blue-500/10"
 							: "border-gray-700 bg-gray-800 hover:bg-gray-700"
 						}`}
@@ -146,7 +149,6 @@ export default function ProjectFilesPage({ params }: Props) {
 						type="file"
 						id="file-upload"
 						multiple
-						accept="video/*,.mov,.mp4,.m4v,.webm,.avi,.mkv,.mpeg,.mpg,.3gp"
 						className="hidden"
 						onChange={(e) => {
 							if (e.target.files) {

@@ -2,11 +2,27 @@ import fs from "fs/promises"
 import path from "path"
 import {
 	INITIAL_PROCESS_STATUS,
+	type ProcessStage,
 	type ProcessStatus,
 } from "@/lib/process-stages"
 import { PROJECTS_DIR } from "@/lib/manifest"
 
 const projectLocks = new Map<string, Promise<unknown>>()
+
+function normalizeStage(stage: string): ProcessStage {
+	if (stage === "finalizing" || stage === "finalising") return "saving"
+	return stage as ProcessStage
+}
+
+function normalizeProcessStatus(status: ProcessStatus): ProcessStatus {
+	return {
+		...status,
+		stage: normalizeStage(status.stage),
+		failedAtStage: status.failedAtStage
+			? normalizeStage(status.failedAtStage)
+			: undefined,
+	}
+}
 
 export function processStatusPath(projectId: string) {
 	return path.join(PROJECTS_DIR, projectId, "process-status.json")
@@ -33,7 +49,7 @@ async function readProcessStatusUnsafe(
 
 	try {
 		const raw = await fs.readFile(filePath, "utf-8")
-		return JSON.parse(raw) as ProcessStatus
+		return normalizeProcessStatus(JSON.parse(raw) as ProcessStatus)
 	} catch (err: unknown) {
 		if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
 			return { ...INITIAL_PROCESS_STATUS }
@@ -109,7 +125,7 @@ export async function patchProcessStatus(
 }
 
 export function isProcessing(status: ProcessStatus) {
-	return ["preparing", "analysing", "processing", "finalizing"].includes(
+	return ["preparing", "analysing", "processing", "saving"].includes(
 		status.stage
 	)
 }

@@ -3,10 +3,12 @@ import {
 	CheckCircle2,
 	Circle,
 	Clapperboard,
+	Video,
 	FileSearch,
 	Loader2,
 	Settings2,
 	XCircle,
+	FolderCheck,
 } from "lucide-react"
 
 export type ProcessStage =
@@ -14,7 +16,7 @@ export type ProcessStage =
 	| "preparing"
 	| "analysing"
 	| "processing"
-	| "finalizing"
+	| "saving"
 	| "complete"
 	| "error"
 
@@ -79,14 +81,15 @@ export const PIPELINE_STAGES: StageMeta[] = [
 		id: "processing",
 		label: "Processing videos",
 		description:
-			"Applying lens correction, reframing to your aspect ratio, and encoding each clip.",
-		icon: Clapperboard,
+			"Applying lens correction, reframing to your aspect ratio, and correctly encoding each clip.",
+		icon: Video,
 	},
 	{
-		id: "finalizing",
-		label: "Finalizing",
-		description: "Saving processed outputs and updating your project manifest.",
-		icon: Loader2,
+		id: "saving",
+		label: "Saving processed videos",
+		description:
+			"Writing encoded files to disk and updating your project manifest.",
+		icon: FolderCheck,
 	},
 	{
 		id: "complete",
