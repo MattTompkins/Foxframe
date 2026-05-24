@@ -3,9 +3,19 @@ import {
 	computeEditDuration,
 	DEFAULT_VIDEO_TRACK_ID,
 	normalizeProjectEdit,
+	normalizeTimelineClip,
+	roundTimelineSeconds,
+	type EditTrackType,
 	type ProjectEdit,
 	type TimelineClip,
 } from "@/lib/edit-core"
+
+export const CLIP_DRAG_MIME = "application/x-foxframe-clip"
+
+export function snapToFrame(seconds: number, fps: number) {
+	if (fps <= 0) return roundTimelineSeconds(Math.max(0, seconds))
+	return roundTimelineSeconds(Math.max(0, Math.round(seconds * fps) / fps))
+}
 
 function newClipId() {
 	return crypto.randomUUID()
@@ -61,6 +71,45 @@ export function updateEditClips(
 	return normalizeProjectEdit({
 		...edit,
 		clips,
+		updatedAt: new Date().toISOString(),
+	})
+}
+
+export function moveTimelineClip(
+	edit: ProjectEdit,
+	clipId: string,
+	patch: { startOnTimeline?: number; trackId?: string }
+): ProjectEdit {
+	const clips = edit.clips.map((clip) => {
+		if (clip.id !== clipId) return clip
+		return normalizeTimelineClip({
+			...clip,
+			...(patch.startOnTimeline !== undefined
+				? { startOnTimeline: patch.startOnTimeline }
+				: {}),
+			...(patch.trackId !== undefined ? { trackId: patch.trackId } : {}),
+		})
+	})
+
+	return normalizeProjectEdit({
+		...edit,
+		clips,
+		updatedAt: new Date().toISOString(),
+	})
+}
+
+export function addTrackToEdit(
+	edit: ProjectEdit,
+	type: EditTrackType
+): ProjectEdit {
+	const sameType = edit.tracks.filter((track) => track.type === type)
+	const number = sameType.length + 1
+	const id = `track-${type}-${crypto.randomUUID().slice(0, 8)}`
+	const label = type === "video" ? `Video ${number}` : `Audio ${number}`
+
+	return normalizeProjectEdit({
+		...edit,
+		tracks: [...edit.tracks, { id, type, label }],
 		updatedAt: new Date().toISOString(),
 	})
 }

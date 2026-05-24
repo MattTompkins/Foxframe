@@ -6,6 +6,7 @@ import { clipMediaUrl } from "@/components/ClipVideoPreview"
 import { EditorAssetBrowser } from "@/components/EditorAssetBrowser"
 import { EditorHeader } from "@/components/EditorHeader"
 import { EditorPanel } from "@/components/EditorPanel"
+import { EditorResizablePanel } from "@/components/EditorResizablePanel"
 import { EditorTimeline } from "@/components/EditorTimeline"
 import { VideoPlayer } from "@/components/VideoPlayer"
 import type { ClipSegment } from "@/lib/clip-segments"
@@ -15,7 +16,14 @@ import {
 	fetchMostRecentEdit,
 	persistEdit,
 } from "@/lib/edit-client"
-import { DEFAULT_VIDEO_TRACK_ID, type ProjectEdit } from "@/lib/edit-core"
+import type { ProjectEdit } from "@/lib/edit-core"
+import {
+	DEFAULT_EDITOR_LAYOUT,
+	layoutLimits,
+	loadEditorLayout,
+	saveEditorLayout,
+	type EditorLayoutPrefs,
+} from "@/lib/editor-layout"
 
 type ProjectDetails = {
 	id: string
@@ -90,6 +98,9 @@ export default function EditorPage() {
 	const [playheadSeconds, setPlayheadSeconds] = useState(0)
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
+	const [layout, setLayout] = useState(DEFAULT_EDITOR_LAYOUT)
+	const [isWideLayout, setIsWideLayout] = useState(false)
+	const [sizeLimits, setSizeLimits] = useState(layoutLimits)
 
 	const editDirtyRef = useRef(false)
 	const skipPersistRef = useRef(false)
@@ -112,6 +123,32 @@ export default function EditorPage() {
 		},
 		[]
 	)
+
+	const patchLayout = useCallback((patch: Partial<EditorLayoutPrefs>) => {
+		setLayout((prev) => {
+			const next = { ...prev, ...patch }
+			saveEditorLayout(next)
+			return next
+		})
+	}, [])
+
+	useEffect(() => {
+		setLayout(loadEditorLayout())
+
+		const media = window.matchMedia("(min-width: 1024px)")
+		const syncWide = () => setIsWideLayout(media.matches)
+		syncWide()
+		media.addEventListener("change", syncWide)
+
+		const syncLimits = () => setSizeLimits(layoutLimits())
+		syncLimits()
+		window.addEventListener("resize", syncLimits)
+
+		return () => {
+			media.removeEventListener("change", syncWide)
+			window.removeEventListener("resize", syncLimits)
+		}
+	}, [])
 
 	useEffect(() => {
 		if (!projectId) return
@@ -238,24 +275,6 @@ export default function EditorPage() {
 		[applyEdit]
 	)
 
-	const handleAddToTimeline = useCallback(
-		(clipFile: string) => {
-			if (!currentEdit) return
-
-			const duration = clipDurationFromSegments(clipFile, clipSegments)
-
-			updateEdit((edit) =>
-				addClipToEdit(edit, {
-					clipFile,
-					trackId: DEFAULT_VIDEO_TRACK_ID,
-					startOnTimeline: playheadSeconds,
-					sourceDurationSeconds: duration,
-				})
-			)
-		},
-		[currentEdit, clipSegments, playheadSeconds, updateEdit]
-	)
-
 	return (
 		<div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-zinc-950 font-sans text-zinc-100">
 			<EditorHeader
@@ -278,25 +297,49 @@ export default function EditorPage() {
 			)}
 
 			<div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-				<EditorPanel
-					title="Assets"
-					className="w-full shrink-0 border-b lg:w-72 lg:border-b-0 lg:border-r xl:w-80"
-				>
-					<EditorAssetBrowser
-						projectId={projectId}
-						clips={clips}
-						clipSegments={clipSegments}
-						loading={loading}
-						error={null}
-						selectedClipFile={selectedClipFile}
-						onSelectClip={setSelectedClipFile}
-						onAddToTimeline={
-							currentEdit && !editLoading
-								? handleAddToTimeline
-								: undefined
-						}
-					/>
-				</EditorPanel>
+				{isWideLayout ? (
+					<EditorResizablePanel
+						title="Assets"
+						edge="right"
+						size={layout.assetWidth}
+						onSizeChange={(assetWidth) => patchLayout({ assetWidth })}
+						min={sizeLimits.assetWidth.min}
+						max={sizeLimits.assetWidth.max}
+						className="border-b lg:border-b-0"
+					>
+						<EditorAssetBrowser
+							projectId={projectId}
+							clips={clips}
+							clipSegments={clipSegments}
+							loading={loading}
+							error={null}
+							selectedClipFile={selectedClipFile}
+							onSelectClip={setSelectedClipFile}
+							canDragToTimeline={Boolean(currentEdit && !editLoading)}
+						/>
+					</EditorResizablePanel>
+				) : (
+					<EditorResizablePanel
+						title="Assets"
+						edge="bottom"
+						size={layout.assetHeight}
+						onSizeChange={(assetHeight) => patchLayout({ assetHeight })}
+						min={sizeLimits.assetHeight.min}
+						max={sizeLimits.assetHeight.max}
+						className="w-full border-b"
+					>
+						<EditorAssetBrowser
+							projectId={projectId}
+							clips={clips}
+							clipSegments={clipSegments}
+							loading={loading}
+							error={null}
+							selectedClipFile={selectedClipFile}
+							onSelectClip={setSelectedClipFile}
+							canDragToTimeline={Boolean(currentEdit && !editLoading)}
+						/>
+					</EditorResizablePanel>
+				)}
 
 				<EditorPanel
 					title="Canvas"
@@ -332,9 +375,14 @@ export default function EditorPage() {
 				</EditorPanel>
 			</div>
 
-			<EditorPanel
+			<EditorResizablePanel
 				title="Timeline"
-				className="h-52 shrink-0 border-t border-zinc-700 sm:h-56 md:h-60"
+				edge="top"
+				size={layout.timelineHeight}
+				onSizeChange={(timelineHeight) => patchLayout({ timelineHeight })}
+				min={sizeLimits.timeline.min}
+				max={sizeLimits.timeline.max}
+				className=" border-zinc-700"
 				scrollable={false}
 				padded={false}
 			>
@@ -347,10 +395,25 @@ export default function EditorPage() {
 						edit={currentEdit}
 						playheadSeconds={playheadSeconds}
 						onPlayheadChange={setPlayheadSeconds}
+						onEditChange={(next) => updateEdit(() => next)}
+						onAddClipFromAsset={(clipFile, trackId, startOnTimeline) => {
+							const duration = clipDurationFromSegments(
+								clipFile,
+								clipSegments
+							)
+							updateEdit((edit) =>
+								addClipToEdit(edit, {
+									clipFile,
+									trackId,
+									startOnTimeline,
+									sourceDurationSeconds: duration,
+								})
+							)
+						}}
 						saving={editSaving}
 					/>
 				)}
-			</EditorPanel>
+			</EditorResizablePanel>
 		</div>
 	)
 }
