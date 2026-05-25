@@ -323,7 +323,7 @@ export function EditorHeader({
                     className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white sm:px-4 sm:py-2.5"
                     href={`/project/${projectId}`}
                 >
-                    Project home
+                    Manage project
                 </Link>
 
                 <button
